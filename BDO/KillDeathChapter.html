@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BDO Kill/Death Chapter Marker</title>
+<style>
+:root{
+  --bg:#12141a; --panel:#1b1e27; --card:#232734; --line:#333a4d;
+  --fg:#dfe3ec; --dim:#8b93a7; --acc:#5aa0ff;
+  --kill:#ff5a5a; --death:#7f8cff; --manual:#ffd257;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 "Segoe UI","Yu Gothic UI",sans-serif}
+header{padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+header h1{font-size:15px;margin:0;font-weight:600}
+header .dim{color:var(--dim);font-size:12px}
+main{display:flex;gap:12px;padding:12px;align-items:flex-start}
+#left{flex:1;min-width:0}
+#panel{width:410px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
+#left{position:sticky;top:12px;align-self:flex-start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.card h2{font-size:13px;margin:0 0 8px;color:var(--acc);font-weight:600}
+.card .hint{color:var(--dim);font-size:12px;margin:4px 0}
+button{background:#2e3648;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px}
+button:hover{background:#3a4459}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--acc);border-color:var(--acc);color:#0b1220;font-weight:600}
+button.primary:hover{filter:brightness(1.1)}
+button.danger{color:#ff8a8a}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0}
+label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);margin:4px 0}
+label.sl input[type=range]{flex:1}
+label.sl .val{width:38px;text-align:right;color:var(--fg)}
+select,input[type=file]{font-size:13px}
+#videoWrap{position:relative;background:#000;border-radius:8px;overflow:hidden}
+video{display:block;width:100%;max-height:62vh;background:#000}
+#roiLayer{position:absolute;inset:0;cursor:crosshair;display:none;z-index:5}
+#roiRect{position:absolute;border:2px solid var(--kill);background:rgba(255,90,90,.15);pointer-events:none}
+#roiSaved{position:absolute;border:1.5px dashed var(--kill);pointer-events:none;display:none;z-index:4}
+#timeline{width:100%;height:74px;display:block;margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:8px;cursor:pointer}
+#transport{display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap}
+#transport .spacer{flex:1}
+.badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600}
+.b-kill{background:rgba(255,90,90,.18);color:var(--kill)}
+.b-death{background:rgba(127,140,255,.18);color:var(--death)}
+.b-manual{background:rgba(255,210,87,.18);color:var(--manual)}
+#chapList{margin-top:6px}
+.chap{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;border-bottom:1px solid #262b3a}
+.chap:hover{background:#2a3040}
+.chap .t{font-family:Consolas,monospace;font-size:13px;width:70px}
+.chap .src{color:var(--dim);font-size:11px;flex:1}
+.chap .del{background:none;border:none;color:var(--dim);padding:2px 6px}
+.chap .del:hover{color:#ff8a8a}
+progress{width:100%;height:8px}
+.status{font-size:12px;color:var(--dim);min-height:16px;margin-top:4px;white-space:pre-line}
+.ok{color:#7ddc8a}
+.warn{color:#ffb45a}
+details summary{cursor:pointer;color:var(--dim);font-size:12px}
+kbd{background:#2e3648;border:1px solid var(--line);border-radius:3px;padding:0 4px;font-size:11px}
+#dropHint{padding:60px 20px;text-align:center;color:var(--dim);border:2px dashed var(--line);border-radius:8px}
+.step{display:inline-block;background:#2e3648;border-radius:50%;width:18px;height:18px;text-align:center;line-height:18px;font-size:11px;margin-right:4px}
+.legend{font-size:11px;color:var(--dim)}
+.legend .sw{display:inline-block;width:14px;height:3px;vertical-align:middle;margin:0 3px 0 8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>BDO Kill/Death Chapter Marker <span style="color:var(--acc)">v1.03</span></h1>
+</header>
+<main>
+  <section id="left">
+    <div id="videoWrap">
+      <div id="dropHint">ここに録画ファイルをドロップ、または右の「ファイルを開く」<br><span style="font-size:12px">対応: mp4 / webm / mkv (Chrome推奨)</span></div>
+      <video id="video" controls style="display:none"></video>
+      <div id="roiLayer"><div id="roiRect"></div></div>
+      <div id="roiSaved"></div>
+    </div>
+    <canvas id="timeline" title="クリックでシーク"></canvas>
+    <div class="legend">グラフ: <span class="sw" style="background:rgba(255,210,87,.8)"></span>KILL一致度 <span class="sw" style="background:rgba(255,90,90,.8)"></span>HP残量 <span class="sw" style="background:rgba(120,160,255,.8)"></span>HPバー可視</div>
+    <div id="transport">
+      <button id="btnKillHere" title="ショートカット: K">＋キル(手動)</button>
+      <button id="btnDeathHere" title="ショートカット: D">＋デス(手動)</button>
+      <span class="spacer"></span>
+      <span class="dim" style="font-size:12px">ジャンプ時の巻き戻し:</span>
+      <select id="preroll"><option value="0">0秒</option><option value="2" selected>2秒</option><option value="5">5秒</option></select>
+      <span class="dim" style="font-size:12px"><kbd>K</kbd>キル <kbd>D</kbd>デス <kbd>←</kbd><kbd>→</kbd>5秒</span>
+    </div>
+  </section>
+
+  <aside id="panel">
+    <div class="card">
+      <h2>ファイル</h2>
+      <div class="row">
+        <button class="primary" id="btnOpen">ファイルを開く</button>
+        <input type="file" id="fileInput" accept="video/*,.mkv" style="display:none">
+        <span id="fileName" class="dim" style="font-size:12px"></span>
+      </div>
+      <div class="status" id="fileStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>1. キャリブレーション</h2>
+      <div class="hint"><span class="step">1</span>KILL表示が出ている瞬間で一時停止し、<b>KILL文字とその周りの赤い部分</b>を囲んでください。<br>(敵プレーヤ名の左側のKILL部分)</div>
+      <div class="row">
+        <button id="btnRoiTmpl">🎯 KILL表示をドラッグで囲む</button>
+        <button id="btnRoiAdd" disabled title="別のKILL表示(または同じ表示の薄くなった瞬間)で一時停止して押すと、形状テンプレートが平均化されて頑健になります">＋追加学習</button>
+        <span id="roiTmplState" class="dim" style="font-size:12px">未設定</span>
+      </div>
+      <div class="hint">設定後、別のKILL表示の瞬間で「＋追加学習」を押すほど精度が上がります (2〜5回推奨)。</div>
+      <div class="hint"><span class="step">2</span>デス判定用のHPバー位置 (既定は標準UI配置)。</div>
+      <div class="row">
+        <button id="btnHpRoi">❤️ HPバーをドラッグで囲む (任意)</button>
+        <span id="hpRoiState" class="dim" style="font-size:12px">既定 (左上)</span>
+        <button id="btnHpTest" title="現在のフレームでHPバーの判定状態を確認">確認</button>
+      </div>
+      <div class="hint"><span class="step">3</span>UI可視判定用の白い剣アイコン (HPバー上)。<br>設定するとマップ等でUIが隠れた時の誤デス判定を防げます。</div>
+      <div class="row">
+        <button id="btnIconTmpl">🗡️ 剣アイコンを囲む (任意)</button>
+        <button id="btnIconPreset" title="標準UI配置を仮定して現在のフレームから取得">既定位置で取得 (推奨)</button>
+        <span id="iconTmplState" class="dim" style="font-size:12px">未設定</span>
+      </div>
+      <div class="status" id="calibStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>2. スキャン</h2>
+      <div class="row">
+        <button class="primary" id="btnVideoScan">映像スキャン (キル+デス)</button>
+        <button id="btnCancel" disabled>中止</button>
+        <span class="dim" style="font-size:12px">速度:</span>
+        <select id="scanSpeed"><option value="4">4倍</option><option value="8" selected>8倍</option><option value="16">16倍</option></select>
+      </div>
+      <div class="hint">8倍速推奨です。フレーム落ちを感じたら低倍速にしてください。<br><b>スキャン中はこのタブを表示したままにしてください。</b><br>(隠すと自動で一時停止し、戻すと再開します)</div>
+      <progress id="prog" value="0" max="1" style="display:none"></progress>
+      <div class="status" id="scanStatus"></div>
+      <details>
+        <summary>検出しきい値 (スキャン後もスライダーで即時再判定)</summary>
+        <label class="sl">KILL一致度 <input type="range" id="thRoi" min="0.20" max="0.90" step="0.01" value="0.50"><span class="val" id="thRoiV">0.50</span></label>
+        <label class="sl">HP空しきい値 <input type="range" id="thHp" min="0.01" max="0.20" step="0.01" value="0.01"><span class="val" id="thHpV">0.01</span></label>
+        <label class="sl">KILL表示持続秒 <input type="range" id="durBanner" min="2.5" max="5.5" step="0.1" value="3.8"><span class="val" id="durBannerV">3.8</span></label>
+        <label class="sl">アイコン可視 <input type="range" id="thIcon" min="0.30" max="0.90" step="0.01" value="0.60"><span class="val" id="thIconV">0.60</span></label>
+        <label class="sl">空バー明度上限* <input type="range" id="thBarLum" min="0.15" max="0.50" step="0.01" value="0.30"><span class="val" id="thBarLumV">0.30</span></label>
+        <div class="hint">* 空バー明度上限は剣アイコン未設定時の代替判定にのみ使用。</div>
+      </details>
+    </div>
+
+    <div class="card" id="chapCard">
+      <h2>3. チャプター <span id="chapCount" class="dim"></span></h2>
+      <div class="row">
+        <button id="btnExportJson">JSON保存</button>
+        <button id="btnExportYt">YouTube形式コピー</button>
+        <button class="danger" id="btnClearAuto">自動検出をクリア</button>
+      </div>
+      <div class="row" style="align-items:center">
+        <span class="dim" style="font-size:12px">クリップ範囲: キル前</span>
+        <input type="number" id="clipPre" value="10" min="0" max="120" step="1" style="width:52px">
+        <span class="dim" style="font-size:12px">秒 〜 キル後</span>
+        <input type="number" id="clipPost" value="5" min="0" max="120" step="1" style="width:52px">
+        <span class="dim" style="font-size:12px">秒</span>
+      </div>
+      <div class="row">
+        <button class="primary" id="btnBat">⬇ 無劣化切り出し (.bat生成)</button>
+        <button id="btnCmdCopy" title="ffmpegコマンドをクリップボードにコピー">📋 コマンドをコピー</button>
+      </div>
+      <div class="hint">無劣化・高速切り出しはffmpegコマンドを生成します。<b>ffmpegインストール済みのPC</b>で、生成した.batを<b>動画と同じフォルダ</b>に置いて実行してください。キーフレーム単位で切るため開始位置は指定より最大1〜2秒早くなります(前が余分に入るだけ)。範囲が重なるキルは1本にまとめます。</div>
+      <div class="row">
+        <button id="btnClips">🎥 ブラウザで書き出し (webm/再エンコード)</button>
+        <button id="btnClipCancel" disabled>中止</button>
+      </div>
+      <div class="status" id="clipStatus"></div>
+      <div id="chapList"></div>
+    </div>
+    <div class="card">
+      <h2>保存データ</h2>
+      <div class="row" style="justify-content:space-between">
+        <span class="dim" style="font-size:12px">キャリブレーション: <span id="stCalib" style="color:var(--fg)">0 KB</span></span>
+        <button class="danger" id="btnDelCalib">削除</button>
+      </div>
+      <div class="row" style="justify-content:space-between">
+        <span class="dim" style="font-size:12px">スキャン結果: <span id="stFiles" style="color:var(--fg)">0 KB</span></span>
+        <button class="danger" id="btnDelResults">全動画分を削除</button>
+      </div>
+      <div class="hint">ブラウザ内(localStorage)に保存。全体の上限は約5MBです。</div>
+    </div>
+  </aside>
+</main>
+
+<script>
+"use strict";
+/* ============================== state ============================== */
+const $ = id => document.getElementById(id);
+const video = $("video");
+const S = {
+  file:null, key:null, duration:0,
+  roiTmpl:null,   // {w,h,glyphIdx,redIdx,cTmpl,vx,vy,vw,vh}  原寸(上限280px幅)
+  iconTmpl:null,  // {w,h,data:Float32Array(zero-mean unit-norm gray),rx,ry,rw,rh}
+  hpRoi:{rx:0.0635,ry:0.0389,rw:0.1807,rh:0.0204,preset:true},
+  iconPreset:{rx:0.0583,ry:0.0065,rw:0.0146,rh:0.0204},
+  samples:[],     // [{t, roi, hp, ic, hl, hs, icTmpl}]
+  manual:[], suppress:[],
+  cancel:false, busy:false, roiTarget:null,
+};
+const SHIFTS=[-3,-2,-1,0,1,2,3];   // KILL位置探索 (±3px全探索)
+const fmt = s => { s=Math.max(0,s); const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=Math.floor(s%60);
+  return (h?h+":":"")+String(m).padStart(h?2:1,"0")+":"+String(x).padStart(2,"0"); };
+const fmtMs = s => fmt(s)+"."+String(Math.floor(s%1*10));
+function setStatus(el,msg,cls){ el.textContent=msg; el.className="status"+(cls?" "+cls:""); }
+const isYellow=(r,g,b)=> r>128 && g>76 && b<102 && g<r*1.1;
+const isRed=(r,g,b)=> r>90 && r>g*1.6 && r>b*1.6;
+
+/* ============================== file load ============================== */
+$("btnOpen").onclick = ()=>$("fileInput").click();
+$("fileInput").onchange = e => { if(e.target.files[0]) loadFile(e.target.files[0]); };
+document.addEventListener("dragover",e=>e.preventDefault());
+document.addEventListener("drop",e=>{ e.preventDefault(); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+
+function loadFile(f){
+  S.file=f; S.key="bdochap6:"+f.name+":"+f.size;
+  S.samples=[]; S.manual=[]; S.suppress=[];   // キャリブレーション(テンプレート類)は動画間で引き継ぐ
+  video.src=URL.createObjectURL(f);
+  video.style.display="block"; $("dropHint").style.display="none";
+  $("fileName").textContent=f.name+" ("+(f.size/1048576).toFixed(0)+" MB)";
+  video.onloadedmetadata=()=>{ S.duration=video.duration; restore(); applyDetections(); };
+  setStatus($("fileStatus"),"読み込みました。","ok");
+}
+
+/* ============================== ROI selection ============================== */
+const roiLayer=$("roiLayer"), roiRect=$("roiRect"), roiSaved=$("roiSaved");
+let roiDrag=null;
+$("btnRoiTmpl").onclick=()=>startRoiSelect("kill","KILL文字と周囲の赤い帯を囲むようにドラッグしてください。");
+$("btnHpRoi").onclick=()=>startRoiSelect("hp","左上のHPバー(赤いバー)全体を囲むようにドラッグしてください。");
+$("btnIconTmpl").onclick=()=>startRoiSelect("icon","HPバー左上の白い剣アイコンを囲むようにドラッグしてください (アイコンが見えているフレームで)。");
+$("btnIconPreset").onclick=()=>{
+  if(!S.file) return;
+  video.pause();
+  const p=S.iconPreset;
+  captureIconTemplate(p.rx*video.videoWidth,p.ry*video.videoHeight,p.rw*video.videoWidth,p.rh*video.videoHeight);
+};
+function startRoiSelect(target,msg){
+  if(!S.file) return;
+  video.pause(); S.roiTarget=target;
+  roiLayer.style.display="block"; roiRect.style.display="none";
+  setStatus($("calibStatus"),msg);
+}
+function videoContentRect(){
+  const r=video.getBoundingClientRect();
+  const va=video.videoWidth/video.videoHeight, ea=r.width/r.height;
+  let w,h,x,y;
+  if(ea>va){ h=r.height; w=h*va; x=(r.width-w)/2; y=0; } else { w=r.width; h=w/va; x=0; y=(r.height-h)/2; }
+  return {x,y,w,h};
+}
+roiLayer.addEventListener("mousedown",e=>{
+  const r=roiLayer.getBoundingClientRect();
+  roiDrag={x0:e.clientX-r.left,y0:e.clientY-r.top};
+  roiRect.style.display="block";
+});
+roiLayer.addEventListener("mousemove",e=>{
+  if(!roiDrag) return;
+  const r=roiLayer.getBoundingClientRect();
+  const x=e.clientX-r.left,y=e.clientY-r.top;
+  Object.assign(roiRect.style,{left:Math.min(x,roiDrag.x0)+"px",top:Math.min(y,roiDrag.y0)+"px",
+    width:Math.abs(x-roiDrag.x0)+"px",height:Math.abs(y-roiDrag.y0)+"px"});
+});
+roiLayer.addEventListener("mouseup",e=>{
+  if(!roiDrag) return;
+  const r=roiLayer.getBoundingClientRect();
+  const x=e.clientX-r.left,y=e.clientY-r.top;
+  const l=Math.min(x,roiDrag.x0),t=Math.min(y,roiDrag.y0);
+  const w=Math.abs(x-roiDrag.x0),h=Math.abs(y-roiDrag.y0);
+  roiDrag=null; roiLayer.style.display="none"; roiRect.style.display="none";
+  if(w<6||h<4){ setStatus($("calibStatus"),"選択が小さすぎます。やり直してください。","warn"); return; }
+  const c=videoContentRect();
+  const vx=(l-c.x)/c.w*video.videoWidth, vy=(t-c.y)/c.h*video.videoHeight;
+  const vw=w/c.w*video.videoWidth, vh=h/c.h*video.videoHeight;
+  if(S.roiTarget==="kill") captureKillTemplate(vx,vy,vw,vh);
+  else if(S.roiTarget==="icon") captureIconTemplate(vx,vy,vw,vh);
+  else setHpRoi(vx,vy,vw,vh);
+});
+
+/* ---- KILL template: 2値化(Otsu)形状NCC + 位置探索 + 適応赤ゲート ---- */
+let killG=null, killRed=null, killBin=null;
+function ensureBuf(L){
+  if(!killG||killG.length!==L){ killG=new Float32Array(L); killRed=new Uint8Array(L); killBin=new Float32Array(L); }
+}
+function otsuTh(vals,n){
+  const bins=new Float32Array(64);
+  for(let i=0;i<n;i++) bins[Math.min(63,vals[i]>>2)]++;
+  let sumall=0; for(let i=0;i<64;i++) sumall+=bins[i]*(i*4+2);
+  let wB=0,sumB=0,best=0,th=128;
+  for(let i=0;i<64;i++){
+    wB+=bins[i]; if(!wB) continue;
+    const wF=n-wB; if(!wF) break;
+    sumB+=bins[i]*(i*4+2);
+    const mB=sumB/wB, mF=(sumall-sumB)/wF, v=wB*wF*(mB-mF)*(mB-mF);
+    if(v>best){ best=v; th=i*4+4; }
+  }
+  return th;
+}
+function binarizeRoi(q,L,gthr,bthr){   // 赤テストしきい値はテンプレートから (無指定時は既定)
+  gthr=gthr||0.69; bthr=bthr||0.64;
+  for(let i=0;i<L;i++){
+    const R=q[i*4],G=q[i*4+1],B=q[i*4+2];
+    killG[i]=G;
+    killRed[i]=(R>60 && G<R*gthr && B<R*bthr)?1:0;
+  }
+  const th=otsuTh(killG,L);
+  for(let i=0;i<L;i++) killBin[i]=killG[i]>th?1:0;
+}
+function buildT(tmpl){
+  const {w,h,P}=tmpl, M=3, idx=[];
+  for(let y=M;y<h-M;y++)for(let x=M;x<w-M;x++) idx.push(y*w+x);
+  let m=0; for(const i of idx) m+=P[i]; m/=idx.length;
+  const T=new Float32Array(idx.length);
+  let nrm=0;
+  for(let k=0;k<idx.length;k++){ T[k]=P[idx[k]]-m; nrm+=T[k]*T[k]; }
+  nrm=Math.sqrt(nrm)||1;
+  for(let k=0;k<idx.length;k++) T[k]/=nrm;
+  tmpl.intIdx=idx; tmpl.T=T;
+}
+function shapeScore(tmpl){
+  const {w,intIdx,T}=tmpl;
+  let best=-9,bestOff=0;
+  for(const dy of SHIFTS)for(const dx of SHIFTS){
+    const off=dy*w+dx;
+    let s=0,ss=0,dot=0;
+    for(let k=0;k<intIdx.length;k++){
+      const v=killBin[intIdx[k]+off];
+      s+=v; ss+=v*v; dot+=v*T[k];
+    }
+    const n=intIdx.length,m=s/n;
+    const den=Math.sqrt(Math.max(1e-9,ss-n*m*m));
+    const c=dot/den;
+    if(c>best){ best=c; bestOff=off; }
+  }
+  return {score:best,bestOff};
+}
+function killRect(){ const r=S.roiTmpl;
+  return [r.rx*video.videoWidth, r.ry*video.videoHeight, r.rw*video.videoWidth, r.rh*video.videoHeight]; }
+function captureKillTemplate(vx,vy,vw,vh){
+  let TW=Math.round(vw), TH=Math.round(vh);
+  if(TW>280){ TH=Math.max(10,Math.round(TH*280/TW)); TW=280; }
+  if(TH>120){ TW=Math.max(10,Math.round(TW*120/TH)); TH=120; }
+  const cv=document.createElement("canvas"); cv.width=TW; cv.height=TH;
+  const cx=cv.getContext("2d",{willReadFrequently:true});
+  cx.drawImage(video,vx,vy,vw,vh,0,0,TW,TH);
+  const q=cx.getImageData(0,0,TW,TH).data;
+  const L=TW*TH, M=3, redIdx=[];
+  let yellow=0, sumRG=[], sumRB=[];
+  for(let yy=M;yy<TH-M;yy++)for(let xx=M;xx<TW-M;xx++){
+    const i=yy*TW+xx, R=q[i*4],G=q[i*4+1],B=q[i*4+2];
+    if(isYellow(R,G,B)){ yellow++; continue; }
+    if(R>70 && R>G*1.35 && R>B*1.35){ redIdx.push(i); sumRG.push(G/R); sumRB.push(B/R); }
+  }
+  if(yellow<30){
+    setStatus($("calibStatus"),"黄色い文字がほぼ見つかりません (文字"+yellow+"px / 赤"+redIdx.length+"px)。KILLの文字がはっきり見えるフレームで囲んでください。","warn"); return;
+  }
+  let noRedGate=false, gthr=0.69, bthr=0.64;
+  if(redIdx.length<Math.max(30,yellow*0.25)){
+    noRedGate=true;
+    setStatus($("calibStatus"),"赤い帯が少ないため赤ゲートなしで作成します (文字"+yellow+"px / 赤"+redIdx.length+"px)。誤検出が増える場合は赤い帯を含めて囲み直してください。","warn");
+  }else{
+    sumRG.sort((a,b)=>a-b); sumRB.sort((a,b)=>a-b);
+    gthr=Math.min(0.75,sumRG[sumRG.length>>1]+0.25);
+    bthr=Math.min(0.75,sumRB[sumRB.length>>1]+0.25);
+  }
+  ensureBuf(L);
+  binarizeRoi(q,L,gthr,bthr);
+  const tmpl={w:TW,h:TH,P:Float32Array.from(killBin),n:1,redIdx,gthr,bthr,noRedGate,
+    rx:vx/video.videoWidth,ry:vy/video.videoHeight,rw:vw/video.videoWidth,rh:vh/video.videoHeight};
+  buildT(tmpl);
+  S.roiTmpl=tmpl;
+  $("btnRoiAdd").disabled=false;
+  $("roiTmplState").textContent="設定済 (学習1回)"; $("roiTmplState").className="ok";
+  if(!noRedGate)
+    setStatus($("calibStatus"),"KILL形状テンプレート作成 ("+TW+"x"+TH+" / 文字"+yellow+"px / 赤地"+redIdx.length+"px / 赤判定 g<r×"+gthr.toFixed(2)+")。\n別のKILL表示の瞬間で「＋追加学習」を押すと精度が上がります。","ok");
+  showSavedRoi(vx,vy,vw,vh); save();
+}
+$("btnRoiAdd").onclick=()=>{
+  if(!S.file||!S.roiTmpl) return;
+  video.pause();
+  const r=S.roiTmpl, L=r.w*r.h;
+  roiCv.width=r.w; roiCv.height=r.h;
+  const [ax,ay,aw,ah]=killRect();
+  roiCtx.drawImage(video,ax,ay,aw,ah,0,0,r.w,r.h);
+  const q=roiCtx.getImageData(0,0,r.w,r.h).data;
+  ensureBuf(L);
+  binarizeRoi(q,L,r.gthr,r.bthr);
+  const {score,bestOff}=shapeScore(r);
+  if(score<0.3){
+    setStatus($("calibStatus"),"このフレームは現在のテンプレートと一致しません (一致度"+score.toFixed(2)+")。KILL表示が見えている瞬間で押してください。","warn"); return;
+  }
+  for(const i of r.intIdx) r.P[i]=(r.P[i]*r.n+killBin[i+bestOff])/(r.n+1);
+  r.n++;
+  buildT(r);
+  $("roiTmplState").textContent="設定済 (学習"+r.n+"回)"; $("roiTmplState").className="ok";
+  setStatus($("calibStatus"),"追加学習しました (一致度"+score.toFixed(2)+" / 計"+r.n+"回)。","ok");
+  save();
+};
+function killScoreNow(){
+  const r=S.roiTmpl, L=r.w*r.h;
+  const [ax,ay,aw,ah]=killRect();
+  roiCtx.drawImage(video,ax,ay,aw,ah,0,0,r.w,r.h);
+  const q=roiCtx.getImageData(0,0,r.w,r.h).data;
+  ensureBuf(L);
+  binarizeRoi(q,L,r.gthr,r.bthr);
+  const {score,bestOff}=shapeScore(r);
+  if(r.noRedGate||!r.redIdx.length) return score;
+  let rf=0;
+  for(const i of r.redIdx) rf+=killRed[i+bestOff];
+  rf/=r.redIdx.length;
+  return score*Math.min(1,rf/0.30);
+}
+
+/* ---- 剣アイコン template (grayscale NCC) ---- */
+function captureIconTemplate(vx,vy,vw,vh){
+  const TW=28, TH=Math.max(6,Math.round(TW*vh/vw));
+  const cv=document.createElement("canvas"); cv.width=TW; cv.height=TH;
+  const cx=cv.getContext("2d",{willReadFrequently:true});
+  cx.drawImage(video,vx,vy,vw,vh,0,0,TW,TH);
+  const q=cx.getImageData(0,0,TW,TH).data;
+  const L=TW*TH, d=new Float32Array(L);
+  for(let i=0;i<L;i++) d[i]=(q[i*4]*.299+q[i*4+1]*.587+q[i*4+2]*.114)/255;
+  let m=0; for(let i=0;i<L;i++) m+=d[i]; m/=L;
+  let nrm=0; for(let i=0;i<L;i++){ d[i]-=m; nrm+=d[i]*d[i]; }
+  nrm=Math.sqrt(nrm);
+  if(nrm<0.3){ setStatus($("calibStatus"),"アイコンのコントラストが低すぎます。アイコンがはっきり見えるフレームで囲んでください。","warn"); return; }
+  for(let i=0;i<L;i++) d[i]/=nrm;
+  S.iconTmpl={w:TW,h:TH,data:d,rx:vx/video.videoWidth,ry:vy/video.videoHeight,rw:vw/video.videoWidth,rh:vh/video.videoHeight};
+  iconCv.width=TW; iconCv.height=TH;
+  $("iconTmplState").textContent="設定済"; $("iconTmplState").className="ok";
+  const sc=iconScoreNow();
+  setStatus($("calibStatus"),"剣アイコンテンプレートを作成しました (現在フレームの一致度 "+sc.toFixed(2)+")。これがUI可視判定に使われます。",sc>0.8?"ok":"warn");
+  showSavedRoi(vx,vy,vw,vh); save();
+}
+function iconScoreNow(){
+  const r=S.iconTmpl;
+  iconCtx.drawImage(video,r.rx*video.videoWidth,r.ry*video.videoHeight,r.rw*video.videoWidth,r.rh*video.videoHeight,0,0,r.w,r.h);
+  const q=iconCtx.getImageData(0,0,r.w,r.h).data, L=r.w*r.h;
+  let s=0,ss=0,dot=0;
+  for(let i=0;i<L;i++){
+    const v=(q[i*4]*.299+q[i*4+1]*.587+q[i*4+2]*.114)/255;
+    s+=v; ss+=v*v; dot+=v*r.data[i];
+  }
+  const m=s/L;
+  const den=Math.sqrt(Math.max(1e-9,ss-L*m*m));
+  return dot/den;
+}
+
+/* ---- HP bar ---- */
+function setHpRoi(vx,vy,vw,vh){
+  S.hpRoi={rx:vx/video.videoWidth,ry:vy/video.videoHeight,rw:vw/video.videoWidth,rh:vh/video.videoHeight,preset:false};
+  $("hpRoiState").textContent="設定済"; $("hpRoiState").className="ok";
+  const st=hpStatsNow();
+  setStatus($("calibStatus"),"HPバー領域を設定しました。現在フレーム: "+stateLabel(st)+" (赤率"+(st.hp*100).toFixed(0)+"%)",st.hp>0.5?"ok":"warn");
+  showSavedRoi(vx,vy,vw,vh); save();
+}
+function showSavedRoi(vx,vy,vw,vh){
+  const c=videoContentRect(), vr=video.getBoundingClientRect(), wr=$("videoWrap").getBoundingClientRect();
+  Object.assign(roiSaved.style,{display:"block",
+    left:(vr.left-wr.left+c.x+vx/video.videoWidth*c.w)+"px",
+    top:(vr.top-wr.top+c.y+vy/video.videoHeight*c.h)+"px",
+    width:(vw/video.videoWidth*c.w)+"px", height:(vh/video.videoHeight*c.h)+"px"});
+  setTimeout(()=>roiSaved.style.display="none",2500);
+}
+$("btnHpTest").onclick=()=>{
+  if(!S.file) return;
+  const st=hpStatsNow();
+  const r=S.hpRoi;
+  showSavedRoi(r.rx*video.videoWidth,r.ry*video.videoHeight,r.rw*video.videoWidth,r.rh*video.videoHeight);
+  let msg="現在フレームのHPバー: "+stateLabel(st)+"\n赤率 "+(st.hp*100).toFixed(0)+"%";
+  if(S.iconTmpl) msg+=" / アイコン一致度 "+st.ic.toFixed(2);
+  else msg+=" / 明度 "+st.hl.toFixed(2)+" / 彩度 "+st.hs.toFixed(2)+" (アイコン未設定のため明度・彩度で可視判定)";
+  msg+="\n生存中→「生存」、死亡中→「空バー(デス)」、マップ等で隠れた時→「隠れ/不明」なら正しい設定です。";
+  setStatus($("calibStatus"),msg,hpState(st)===1?"ok":undefined);
+};
+
+/* ============================== HP bar state ============================== */
+const hpCv=document.createElement("canvas"); hpCv.width=84; hpCv.height=8;
+const hpCtx=hpCv.getContext("2d",{willReadFrequently:true});
+const iconCv=document.createElement("canvas");
+const iconCtx=iconCv.getContext("2d",{willReadFrequently:true});
+const roiCv=document.createElement("canvas");
+const roiCtx=roiCv.getContext("2d",{willReadFrequently:true});
+
+function hpStatsNow(){
+  const r=S.hpRoi;
+  hpCtx.drawImage(video,r.rx*video.videoWidth,r.ry*video.videoHeight,r.rw*video.videoWidth,r.rh*video.videoHeight,0,0,84,8);
+  const q=hpCtx.getImageData(0,0,84,8).data;
+  let red=0,lum=0,sat=0;
+  const N=84*8;
+  for(let i=0;i<N;i++){
+    const R=q[i*4],G=q[i*4+1],B=q[i*4+2];
+    if(isRed(R,G,B)) red++;
+    lum+=R*.299+G*.587+B*.114;
+    const mx=Math.max(R,G,B),mn=Math.min(R,G,B);
+    sat+=(mx-mn)/(mx+1);
+  }
+  const ic=S.iconTmpl?iconScoreNow():1;
+  return {hp:red/N, hl:lum/N/255, hs:sat/N, ic};
+}
+// 1=生存(赤あり) 0=空バー(デス状態) -1=隠れ/不明
+function hpState(s){
+  const thHp=+$("thHp").value;
+  if(S.iconTmpl||s.icTmpl){
+    if(s.ic<+$("thIcon").value) return -1;
+    return s.hp>=thHp?1:0;
+  }
+  if(s.hp>=thHp) return 1;
+  if(s.hl<+$("thBarLum").value && s.hs<0.35) return 0;
+  return -1;
+}
+const stateLabel=s=>({1:"生存",0:"空バー(デス)","-1":"隠れ/不明"})[hpState(s)];
+
+/* ============================== video scan (fast playback) ============================== */
+async function videoScan(){
+  if(!S.file) return;
+  if(!("requestVideoFrameCallback" in HTMLVideoElement.prototype)){
+    setStatus($("scanStatus"),"このブラウザは高速スキャンに未対応です。Chrome/Edgeを使用してください。","warn"); return;
+  }
+  const st=$("scanStatus");
+  const warns=[];
+  if(!S.roiTmpl) warns.push("KILLテンプレート未設定→キル検出なし");
+  if(!S.iconTmpl) warns.push("剣アイコン未設定→UI可視判定は明度・彩度の代替方式");
+  if(warns.length) setStatus(st,warns.join(" / "),"warn");
+  S.samples=[]; S.cancel=false;
+  const rate=+$("scanSpeed").value;
+  const wasT=video.currentTime;
+  video.muted=true; video.currentTime=0;
+  try{ video.playbackRate=rate; }catch(e){ video.playbackRate=8; }
+  $("prog").style.display="block";
+  await video.play();
+  let lastT=-1;
+  const useRoi=!!S.roiTmpl, useIcon=!!S.iconTmpl;
+  if(useRoi){ roiCv.width=S.roiTmpl.w; roiCv.height=S.roiTmpl.h; killG=null; }
+  if(useIcon){ iconCv.width=S.iconTmpl.w; iconCv.height=S.iconTmpl.h; }
+  await new Promise(resolve=>{
+    const onEnd=()=>{ cleanup(); resolve(); };
+    const cleanup=()=>{ video.removeEventListener("ended",onEnd); };
+    video.addEventListener("ended",onEnd);
+    const step=()=>{
+      video.requestVideoFrameCallback((now,meta)=>{
+        if(S.cancel||video.ended){ cleanup(); resolve(); return; }
+        const t=meta.mediaTime;
+        if(t-lastT>0.1){
+          lastT=t;
+          const roi=useRoi?killScoreNow():0;
+          const h=hpStatsNow();
+          S.samples.push({t:+t.toFixed(3),roi:+roi.toFixed(4),hp:+h.hp.toFixed(4),ic:+h.ic.toFixed(4),hl:+h.hl.toFixed(4),hs:+h.hs.toFixed(4),icTmpl:useIcon?1:0});
+          $("prog").value=t/S.duration;
+          if(S.samples.length%40===0){ setStatus(st,"映像スキャン中… "+fmt(t)+" / "+fmt(S.duration)); drawTimeline(); }
+        }
+        step();
+      });
+    };
+    step();
+  });
+  video.pause(); video.muted=false; video.playbackRate=1; video.currentTime=wasT;
+  $("prog").style.display="none";
+  if(S.cancel) setStatus(st,"中止しました。(途中までのデータで判定します)","warn");
+  applyDetections();
+  setStatus(st,"映像スキャン完了。キル "+detectKills().length+" 件 / デス "+detectDeaths().length+" 件","ok");
+  save();
+}
+
+/* ---- kills: 連続高スコア区間をキルに変換。
+   バナーは1キルにつき約DUR秒表示され、連続キル時は短い消灯(0.2〜1秒)を挟んで再表示される。
+   → 消灯(2サンプル以上の低下)で区間を分割し、さらに区間が長すぎる場合は持続時間から複数キルと推定 ---- */
+function detectKills(){
+  const th=+$("thRoi").value, DUR=+$("durBanner").value, s=S.samples, out=[];
+  let i=0;
+  while(i<s.length){
+    if(s[i].roi>=th){
+      const start=s[i].t;
+      let end=s[i].t, low=0, cnt=1, k=i+1;
+      for(;k<s.length;k++){
+        if(s[k].roi>=th){ end=s[k].t; cnt++; low=0; }
+        else{ low++; if(low>=2) break; }   // 2サンプル連続低下=消灯 → 区間終了
+      }
+      const dur=end-start;
+      if(cnt>=3 && dur>=0.6){
+        const n=Math.max(1,Math.ceil((dur-0.4)/(DUR+0.4)));   // 長い区間は複数キル
+        if(n===1) out.push(start);
+        else{
+          const last=end-DUR;   // 最後のキルはフル表示で終わる
+          for(let j=0;j<n;j++) out.push(start+(last-start)*j/(n-1));
+        }
+      }
+      i=k; continue;
+    }
+    i++;
+  }
+  return out.map(x=>({t:Math.max(0,x-0.2),type:"kill",src:"表示",score:1}));
+}
+
+/* ---- deaths: 赤が消え、UIが隠れていない状態が続く ---- */
+function detectDeaths(){
+  const s=S.samples; if(s.length<20) return [];
+  const out=[];
+  let lastAlive=-1e9, i=0;
+  while(i<s.length){
+    const st=hpState(s[i]);
+    if(st===1){ lastAlive=s[i].t; i++; continue; }
+    if(st===0 && s[i].t-lastAlive<5){
+      const t0=s[i].t;
+      let k=i, empty=0, other=0;
+      while(k<s.length && s[k].t<t0+1.6){ if(hpState(s[k])===0) empty++; else other++; k++; }
+      if(empty>=3 && other<=1){
+        out.push({t:t0,type:"death",src:"HP0",score:1});
+        while(i<s.length && hpState(s[i])!==1) i++;  // 復活(赤が戻る)まで飛ばす
+        continue;
+      }
+    }
+    i++;
+  }
+  return out;
+}
+
+/* ============================== chapters ============================== */
+function buildChapters(){
+  const kills=detectKills(), deaths=detectDeaths();
+  const man=S.manual.map(m=>({...m,src:"手動",score:1}));
+  let ch=kills.concat(deaths,man).sort((a,b)=>a.t-b.t);
+  ch=ch.filter(c=>!S.suppress.some(s=>s.type===c.type&&Math.abs(s.t-c.t)<0.3));
+  return ch;
+}
+let chapters=[];
+function applyDetections(){ chapters=buildChapters(); renderChapters(); drawTimeline(); }
+
+function renderChapters(){
+  const box=$("chapList"); box.innerHTML="";
+  $("chapCount").textContent=chapters.length?("("+chapters.length+")"):"";
+  for(const c of chapters){
+    const div=document.createElement("div"); div.className="chap";
+    const cls=c.src==="手動"?"b-manual":(c.type==="kill"?"b-kill":"b-death");
+    div.innerHTML=`<span class="t">${fmtMs(c.t)}</span>
+      <span class="badge ${cls}">${c.type==="kill"?"キル":"デス"}</span>
+      <span class="src">${c.src}</span>
+      <button class="del" title="削除">✕</button>`;
+    div.onclick=e=>{
+      if(e.target.classList.contains("del")){ removeChapter(c); return; }
+      video.currentTime=Math.max(0,c.t-(+$("preroll").value)); video.play();
+    };
+    box.appendChild(div);
+  }
+}
+function removeChapter(c){
+  if(c.src==="手動") S.manual=S.manual.filter(m=>!(Math.abs(m.t-c.t)<0.01&&m.type===c.type));
+  else S.suppress.push({t:c.t,type:c.type});
+  applyDetections(); save();
+}
+$("btnClearAuto").onclick=()=>{ S.samples=[]; S.suppress=[]; applyDetections(); save(); };
+$("btnKillHere").onclick=()=>{ if(S.file){ S.manual.push({t:video.currentTime,type:"kill"}); applyDetections(); save(); } };
+$("btnDeathHere").onclick=()=>{ if(S.file){ S.manual.push({t:video.currentTime,type:"death"}); applyDetections(); save(); } };
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT"||!S.file) return;
+  if(e.key==="k"||e.key==="K") $("btnKillHere").click();
+  else if(e.key==="d"||e.key==="D") $("btnDeathHere").click();
+  else if(e.key==="ArrowLeft"){ video.currentTime-=5; e.preventDefault(); }
+  else if(e.key==="ArrowRight"){ video.currentTime+=5; e.preventDefault(); }
+});
+
+/* ============================== timeline ============================== */
+const tl=$("timeline"), tctx=tl.getContext("2d");
+function drawTimeline(){
+  const w=tl.clientWidth, h=74;
+  if(tl.width!==Math.round(w*devicePixelRatio)){ tl.width=Math.round(w*devicePixelRatio); tl.height=Math.round(h*devicePixelRatio); }
+  tctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  tctx.clearRect(0,0,w,h);
+  if(!S.duration) return;
+  if(S.samples.length>1){
+    const plot=(get,style)=>{
+      tctx.beginPath(); tctx.strokeStyle=style; tctx.lineWidth=1;
+      for(let i=0;i<S.samples.length;i++){
+        const v=Math.max(0,Math.min(1,get(S.samples[i])));
+        const x=S.samples[i].t/S.duration*w, y=h-6-v*(h-16);
+        i?tctx.lineTo(x,y):tctx.moveTo(x,y);
+      }
+      tctx.stroke();
+    };
+    plot(s=>s.roi,"rgba(255,210,87,.6)");
+    plot(s=>s.hp,"rgba(255,90,90,.65)");
+    if(S.samples[0].icTmpl) plot(s=>s.ic,"rgba(120,160,255,.35)");
+  }
+  for(const c of chapters){
+    const x=c.t/S.duration*w;
+    tctx.fillStyle=c.src==="手動"?"#ffd257":(c.type==="kill"?"#ff5a5a":"#7f8cff");
+    if(c.type==="kill"){ tctx.beginPath(); tctx.moveTo(x,4); tctx.lineTo(x-4,14); tctx.lineTo(x+4,14); tctx.fill(); }
+    else tctx.fillRect(x-2,4,4,10);
+    tctx.fillRect(x-0.5,14,1,h-20);
+  }
+  const px=video.currentTime/S.duration*w;
+  tctx.fillStyle="#dfe3ec"; tctx.fillRect(px-0.75,0,1.5,h);
+}
+tl.onclick=e=>{
+  if(!S.duration) return;
+  const r=tl.getBoundingClientRect();
+  video.currentTime=(e.clientX-r.left)/r.width*S.duration;
+};
+video.addEventListener("timeupdate",drawTimeline);
+new ResizeObserver(drawTimeline).observe(tl);
+
+/* ============================== scan control / thresholds ============================== */
+async function guarded(fn){
+  if(S.busy) return;
+  S.busy=true; S.cancel=false;
+  $("btnCancel").disabled=false; $("btnVideoScan").disabled=true;
+  try{ await fn(); } finally{
+    S.busy=false; $("btnCancel").disabled=true; $("btnVideoScan").disabled=false;
+    $("prog").style.display="none";
+  }
+}
+$("btnVideoScan").onclick=()=>guarded(videoScan);
+$("btnCancel").onclick=()=>{ S.cancel=true; };
+for(const [id,vid] of [["thRoi","thRoiV"],["thHp","thHpV"],["thIcon","thIconV"],["thBarLum","thBarLumV"],["durBanner","durBannerV"]]){
+  $(id).oninput=()=>{ $(vid).textContent=(+$(id).value).toFixed(2); applyDetections(); updateCounts(); saveSoon(); };
+}
+
+/* ---- タブ非表示中はスキャンを自動一時停止 (rVFCが発火せず欠落するため) ---- */
+document.addEventListener("visibilitychange",()=>{
+  if(!S.busy) return;
+  if(document.hidden){
+    video.pause();
+    setStatus($("scanStatus"),"タブが隠れたためスキャンを一時停止中… このタブに戻ると自動再開します。","warn");
+  }else{
+    video.play();
+    setStatus($("scanStatus"),"スキャンを再開しました。");
+  }
+});
+/* ---- しきい値変更後の件数表示更新 ---- */
+function updateCounts(){
+  if(S.samples.length>19 && !S.busy)
+    setStatus($("scanStatus"),"キル "+detectKills().length+" 件 / デス "+detectDeaths().length+" 件 (しきい値反映済)","ok");
+}
+
+/* ============================== export ============================== */
+$("btnExportJson").onclick=()=>{
+  const data=JSON.stringify({file:S.file?.name,duration:S.duration,
+    chapters:chapters.map(c=>({time:+c.t.toFixed(2),timestamp:fmtMs(c.t),type:c.type,source:c.src}))},null,2);
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([data],{type:"application/json"}));
+  a.download=(S.file?.name||"chapters")+".chapters.json"; a.click();
+};
+$("btnExportYt").onclick=async()=>{
+  let txt="0:00 開始\n", k=0, d=0;
+  for(const c of chapters){ c.type==="kill"?k++:d++; txt+=fmt(c.t)+" "+(c.type==="kill"?"キル #"+k:"デス #"+d)+"\n"; }
+  await navigator.clipboard.writeText(txt);
+  setStatus($("scanStatus"),"YouTubeチャプター形式をクリップボードにコピーしました。","ok");
+};
+
+/* ============================== clip export (MediaRecorder) ============================== */
+let audioGraph=null;
+function ensureAudioGraph(){
+  if(audioGraph!==null) return audioGraph;
+  try{
+    const ctx=new AudioContext();
+    const src=ctx.createMediaElementSource(video);
+    const spk=ctx.createGain();
+    src.connect(spk); spk.connect(ctx.destination);
+    audioGraph={ctx,src,spk};
+  }catch(e){ audioGraph=false; }   // 失敗時はスピーカー音ありで録画
+  return audioGraph;
+}
+function mergedKillRanges(pre,post){
+  const kills=chapters.filter(c=>c.type==="kill").map(c=>c.t).sort((a,b)=>a-b);
+  const rs=[];
+  for(const t of kills){
+    const a=Math.max(0,t-pre), b=Math.min(S.duration,t+post);
+    if(rs.length && a<=rs[rs.length-1][1]) rs[rs.length-1][1]=Math.max(rs[rs.length-1][1],b);
+    else rs.push([a,b]);
+  }
+  return rs;
+}
+function recordRange(a,b,idx,g){
+  return new Promise((resolve,reject)=>{
+    let cleanupAudio=null;
+    const onSeek=()=>{
+      video.removeEventListener("seeked",onSeek);
+      let stream;
+      try{
+        stream=video.captureStream();
+        if(g){
+          const dest=g.ctx.createMediaStreamDestination();
+          g.src.connect(dest);
+          g.spk.gain.value=0;   // 書き出し中はスピーカー消音 (クリップには音声が入る)
+          stream=new MediaStream([...stream.getVideoTracks(),...dest.stream.getAudioTracks()]);
+          cleanupAudio=()=>{ try{g.src.disconnect(dest);}catch(e){} g.spk.gain.value=1; };
+        }
+      }catch(e){ reject(e); return; }
+      let mime="video/webm;codecs=vp9,opus";
+      if(!MediaRecorder.isTypeSupported(mime)) mime="video/webm;codecs=vp8,opus";
+      if(!MediaRecorder.isTypeSupported(mime)) mime="video/webm";
+      let rec;
+      try{ rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8e6,audioBitsPerSecond:128e3}); }
+      catch(e){ if(cleanupAudio)cleanupAudio(); reject(e); return; }
+      const chunks=[];
+      rec.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+      rec.onstop=()=>{
+        if(cleanupAudio)cleanupAudio();
+        video.pause();
+        const blob=new Blob(chunks,{type:"video/webm"});
+        const el=document.createElement("a");
+        el.href=URL.createObjectURL(blob);
+        const base=(S.file?S.file.name:"clip").replace(/\.[^.]+$/,"");
+        el.download=base+"_kill"+String(idx).padStart(2,"0")+"_"+fmt(a).replace(/:/g,"m")+"s.webm";
+        el.click();
+        setTimeout(()=>URL.revokeObjectURL(el.href),10000);
+        resolve();
+      };
+      rec.onerror=e=>{ if(cleanupAudio)cleanupAudio(); reject(e.error||new Error("録画エラー")); };
+      rec.start(250);
+      video.play();
+      const tick=()=>{
+        if(rec.state!=="recording") return;
+        if(S.cancelClip||video.currentTime>=b||video.ended){ rec.stop(); return; }
+        requestAnimationFrame(tick);
+      };
+      tick();
+    };
+    video.addEventListener("seeked",onSeek);
+    video.pause();
+    video.playbackRate=1; video.muted=false;
+    video.currentTime=a;
+  });
+}
+function ffmpegCmds(){
+  const pre=Math.max(0,+$("clipPre").value||0), post=Math.max(0,+$("clipPost").value||0);
+  const rs=mergedKillRanges(pre,post);
+  if(!rs.length) return null;
+  const name=S.file?S.file.name:"video.mp4";
+  const base=name.replace(/\.[^.]+$/,"");
+  const ext=(name.match(/\.[^.]+$/)||[".mp4"])[0];
+  return rs.map((r,i)=>{
+    const out=base+"_kill"+String(i+1).padStart(2,"0")+"_"+fmt(r[0]).replace(/:/g,"m")+"s"+ext;
+    return 'ffmpeg -ss '+r[0].toFixed(2)+' -i "'+name+'" -t '+(r[1]-r[0]).toFixed(2)+' -c copy -avoid_negative_ts make_zero "'+out+'"';
+  });
+}
+$("btnBat").onclick=()=>{
+  if(!S.file) return;
+  const cmds=ffmpegCmds();
+  if(!cmds){ setStatus($("clipStatus"),"キルチャプターがありません。","warn"); return; }
+  const bat="@echo off\r\nchcp 65001 >nul\r\nrem このバッチを動画と同じフォルダに置いて実行してください (ffmpegが必要です)\r\n"
+    +cmds.join("\r\n")+"\r\necho.\r\necho 完了しました\r\npause\r\n";
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob(["\ufeff"+bat],{type:"text/plain"}));
+  a.download=(S.file.name.replace(/\.[^.]+$/,""))+"_clips.bat"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+  setStatus($("clipStatus"),cmds.length+"本分の.batを生成しました。動画と同じフォルダに置いて実行してください。","ok");
+};
+$("btnCmdCopy").onclick=async()=>{
+  if(!S.file) return;
+  const cmds=ffmpegCmds();
+  if(!cmds){ setStatus($("clipStatus"),"キルチャプターがありません。","warn"); return; }
+  await navigator.clipboard.writeText(cmds.join("\n"));
+  setStatus($("clipStatus"),cmds.length+"本分のffmpegコマンドをコピーしました。動画のあるフォルダで実行してください。","ok");
+};
+$("btnClips").onclick=async()=>{
+  if(!S.file||S.busy) return;
+  const st=$("clipStatus");
+  const pre=Math.max(0,+$("clipPre").value||0), post=Math.max(0,+$("clipPost").value||0);
+  const rs=mergedKillRanges(pre,post);
+  if(!rs.length){ setStatus(st,"キルチャプターがありません。","warn"); return; }
+  const total=rs.reduce((s,r)=>s+r[1]-r[0],0);
+  if(!confirm(rs.length+"本のクリップ (合計"+fmt(total)+") を書き出します。\n再生しながら録画するため約"+fmt(total)+"かかり、書き出し中はタブを表示したままにする必要があります。よろしいですか?")) return;
+  const g=ensureAudioGraph();
+  if(g&&g.ctx.state==="suspended") await g.ctx.resume();
+  S.busy=true; S.cancelClip=false;
+  $("btnClips").disabled=true; $("btnClipCancel").disabled=false; $("btnVideoScan").disabled=true;
+  const wasT=video.currentTime;
+  let ok=0;
+  try{
+    for(let i=0;i<rs.length;i++){
+      if(S.cancelClip) break;
+      setStatus(st,"クリップ "+(i+1)+"/"+rs.length+" を録画中… ("+fmt(rs[i][0])+" 〜 "+fmt(rs[i][1])+")");
+      await recordRange(rs[i][0],rs[i][1],i+1,g);
+      if(!S.cancelClip) ok++;
+    }
+    setStatus(st,S.cancelClip?("中止しました ("+ok+"本は書き出し済)"):(ok+"本のクリップを書き出しました。"),S.cancelClip?"warn":"ok");
+  }catch(e){
+    setStatus(st,"エラー: "+(e.message||e),"warn");
+  }finally{
+    S.busy=false;
+    $("btnClips").disabled=false; $("btnClipCancel").disabled=true; $("btnVideoScan").disabled=false;
+    video.pause(); video.currentTime=wasT;
+    if(g) g.spk.gain.value=1;
+  }
+};
+$("btnClipCancel").onclick=()=>{ S.cancelClip=true; };
+$("clipPre").onchange=$("clipPost").onchange=()=>saveSoon();
+
+/* ============================== storage management ============================== */
+const fmtKB=n=>n>=1048576?(n/1048576).toFixed(2)+" MB":(n/1024).toFixed(0)+" KB";
+function storageInfo(){
+  let calib=0, files=0, nf=0;
+  try{
+    const c=localStorage.getItem(KEY_CALIB); if(c) calib=c.length*2;   // UTF-16 ≈2byte/文字
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith("bdochap6:")){ files+=(localStorage.getItem(k)||"").length*2; nf++; }
+    }
+  }catch(e){}
+  return {calib,files,nf};
+}
+function renderStorage(){
+  const s=storageInfo();
+  $("stCalib").textContent=fmtKB(s.calib);
+  $("stFiles").textContent=fmtKB(s.files)+" ("+s.nf+"動画分)";
+}
+$("btnDelCalib").onclick=()=>{
+  if(!confirm("キャリブレーション(KILLテンプレート・剣アイコン・HPバー位置)を削除しますか?")) return;
+  try{ localStorage.removeItem(KEY_CALIB); }catch(e){}
+  S.roiTmpl=null; S.iconTmpl=null;
+  S.hpRoi={rx:0.0635,ry:0.0389,rw:0.1807,rh:0.0204,preset:true};
+  $("roiTmplState").textContent="未設定"; $("roiTmplState").className="dim";
+  $("iconTmplState").textContent="未設定"; $("iconTmplState").className="dim";
+  $("hpRoiState").textContent="既定 (左上)"; $("hpRoiState").className="dim";
+  $("btnRoiAdd").disabled=true;
+  setStatus($("calibStatus"),"キャリブレーションを削除しました。","ok");
+  renderStorage();
+};
+$("btnDelResults").onclick=()=>{
+  if(!confirm("全動画のスキャン結果・手動チャプターを削除しますか?")) return;
+  try{
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith("bdochap6:")) keys.push(k);
+    }
+    keys.forEach(k=>localStorage.removeItem(k));
+  }catch(e){}
+  S.samples=[]; S.manual=[]; S.suppress=[];
+  applyDetections();
+  setStatus($("scanStatus"),"全動画のスキャン結果を削除しました。","ok");
+  renderStorage();
+};
+
+/* ============================== persistence ==============================
+   キャリブレーション(テンプレート/HPバー/しきい値)はグローバル保存 → 動画間で引き継ぎ
+   スキャン結果・手動チャプターはファイル別保存 */
+const KEY_CALIB="bdochap:calib:v6";
+let saveT=null;
+function saveSoon(){ clearTimeout(saveT); saveT=setTimeout(save,800); }
+function save(){
+  try{
+    const c={th:{r:$("thRoi").value,h:$("thHp").value,i:$("thIcon").value,l:$("thBarLum").value,d:$("durBanner").value,cp:$("clipPre").value,cq:$("clipPost").value},
+      hpRoi:S.hpRoi,
+      roiTmpl:S.roiTmpl?{w:S.roiTmpl.w,h:S.roiTmpl.h,P:Array.from(S.roiTmpl.P),n:S.roiTmpl.n,redIdx:S.roiTmpl.redIdx,
+        gthr:S.roiTmpl.gthr,bthr:S.roiTmpl.bthr,noRedGate:S.roiTmpl.noRedGate,
+        rx:S.roiTmpl.rx,ry:S.roiTmpl.ry,rw:S.roiTmpl.rw,rh:S.roiTmpl.rh}:null,
+      iconTmpl:S.iconTmpl?{w:S.iconTmpl.w,h:S.iconTmpl.h,data:Array.from(S.iconTmpl.data),
+        rx:S.iconTmpl.rx,ry:S.iconTmpl.ry,rw:S.iconTmpl.rw,rh:S.iconTmpl.rh}:null};
+    localStorage.setItem(KEY_CALIB,JSON.stringify(c));
+  }catch(e){}
+  if(!S.key) return;
+  try{
+    localStorage.setItem(S.key,JSON.stringify({manual:S.manual,suppress:S.suppress,
+      samples:S.samples.length<50000?S.samples:[]}));
+  }catch(e){}
+  renderStorage();
+}
+function restore(){
+  // 1) グローバルキャリブレーション
+  try{
+    const raw=localStorage.getItem(KEY_CALIB);
+    if(raw){
+      const o=JSON.parse(raw);
+      if(o.th&&o.th.r!=null){
+        $("thRoi").value=o.th.r; $("thHp").value=o.th.h;
+        if(o.th.i!=null) $("thIcon").value=o.th.i;
+        if(o.th.l!=null) $("thBarLum").value=o.th.l;
+        if(o.th.d!=null) $("durBanner").value=o.th.d;
+        if(o.th.cp!=null) $("clipPre").value=o.th.cp;
+        if(o.th.cq!=null) $("clipPost").value=o.th.cq;
+        for(const [id,vid] of [["thRoi","thRoiV"],["thHp","thHpV"],["thIcon","thIconV"],["thBarLum","thBarLumV"],["durBanner","durBannerV"]])
+          $(vid).textContent=(+$(id).value).toFixed(2);
+      }
+      if(o.hpRoi){ S.hpRoi=o.hpRoi;
+        if(!o.hpRoi.preset){ $("hpRoiState").textContent="設定済(引き継ぎ)"; $("hpRoiState").className="ok"; } }
+      if(o.roiTmpl&&o.roiTmpl.P){
+        S.roiTmpl={...o.roiTmpl,P:Float32Array.from(o.roiTmpl.P)};
+        buildT(S.roiTmpl);
+        $("btnRoiAdd").disabled=false;
+        $("roiTmplState").textContent="設定済(引き継ぎ・学習"+(S.roiTmpl.n||1)+"回)"; $("roiTmplState").className="ok";
+      }
+      if(o.iconTmpl&&o.iconTmpl.data){
+        S.iconTmpl={...o.iconTmpl,data:new Float32Array(o.iconTmpl.data)};
+        iconCv.width=S.iconTmpl.w; iconCv.height=S.iconTmpl.h;
+        $("iconTmplState").textContent="設定済(引き継ぎ)"; $("iconTmplState").className="ok";
+      }
+      setStatus($("fileStatus"),"前回のキャリブレーションを引き継ぎました。","ok");
+    }
+  }catch(e){}
+  // 2) この動画のスキャン結果・手動チャプター
+  try{
+    const raw=localStorage.getItem(S.key); if(!raw) return;
+    const o=JSON.parse(raw);
+    S.manual=o.manual||[]; S.suppress=o.suppress||[];
+    if(o.samples&&o.samples.length&&o.samples[0].ic!=null) S.samples=o.samples;
+    setStatus($("fileStatus"),"この動画の前回スキャン結果を復元しました。","ok");
+    updateCounts();
+  }catch(e){}
+}
+renderStorage();
+</script>
+</body>
+</html>

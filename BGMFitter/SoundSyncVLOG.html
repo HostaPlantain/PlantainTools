@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音ハメVLOGメーカー</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#1a1e2a; --panel2:#232838; --text:#e8eaf0;
+    --sub:#8b93a7; --accent:#ff5c7a; --accent2:#5cc8ff; --ok:#4ade80;
+    --border:#2e3448; --radius:14px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP",sans-serif;
+    background:var(--bg); color:var(--text); min-height:100vh; padding:24px 16px 80px;
+  }
+  .wrap{max-width:980px; margin:0 auto;}
+  h1{font-size:26px; letter-spacing:.02em;}
+  h1 .dot{color:var(--accent);}
+  .tagline{color:var(--sub); font-size:13px; margin-top:4px; margin-bottom:24px;}
+  section{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:18px; margin-bottom:18px;
+  }
+  section h2{font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:8px;}
+  section h2 .badge{
+    font-size:11px; font-weight:normal; color:var(--sub);
+    background:var(--panel2); border-radius:20px; padding:2px 10px;
+  }
+  .dropzone{
+    border:2px dashed var(--border); border-radius:var(--radius); padding:22px;
+    text-align:center; color:var(--sub); cursor:pointer; transition:.15s; font-size:14px;
+  }
+  .dropzone:hover,.dropzone.over{border-color:var(--accent2); color:var(--accent2); background:rgba(92,200,255,.05);}
+  .clips{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; margin-top:14px;}
+  .clip{
+    background:var(--panel2); border:1px solid var(--border); border-radius:10px;
+    overflow:hidden; position:relative;
+  }
+  .clip.dragging{opacity:.4;}
+  .clip .thumbwrap{position:relative; aspect-ratio:16/9; background:#000; cursor:grab;}
+  .clip .thumbwrap:active{cursor:grabbing;}
+  .clip img{width:100%; height:100%; object-fit:cover; display:block;}
+  .clip .num{
+    position:absolute; top:6px; left:6px; color:#fff;
+    font-size:11px; padding:2px 8px; border-radius:10px; background:rgba(0,0,0,.65);
+    border-left:4px solid transparent;
+  }
+  .clip .del{
+    position:absolute; top:6px; right:6px; background:rgba(0,0,0,.65); color:#fff;
+    border:none; border-radius:50%; width:22px; height:22px; cursor:pointer; font-size:12px; line-height:1;
+  }
+  .clip .del:hover{background:var(--accent);}
+  .clip .body{padding:8px 10px 10px;}
+  .clip .name{font-size:11px; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .clip .meta{font-size:10px; color:var(--sub); margin-top:4px; display:flex; justify-content:space-between;}
+  .clip .meta .envok{color:var(--ok);}
+  .clip .meta .envng{color:var(--accent);}
+  .clip .ctrlrow{display:flex; align-items:center; gap:6px; margin-top:7px;}
+  .clip .aud{
+    flex:1; background:var(--panel); border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:4px 6px; font-size:11px; cursor:pointer; transition:.15s;
+  }
+  .clip .aud.off{color:var(--sub); border-style:dashed;}
+  .row{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+  .btn{
+    background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    border-radius:10px; padding:9px 18px; font-size:14px; cursor:pointer; transition:.15s;
+  }
+  .btn:hover:not(:disabled){border-color:var(--accent2);}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:bold;}
+  .btn.primary:hover:not(:disabled){filter:brightness(1.1);}
+  .btn.small{padding:5px 12px; font-size:12px;}
+  .bgm-info{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:13px;}
+  .bgm-info .chip{background:var(--panel2); border:1px solid var(--border); border-radius:20px; padding:5px 14px;}
+  .bgm-info .chip b{color:var(--accent2);}
+  select{
+    background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    border-radius:8px; padding:6px 10px; font-size:13px;
+  }
+  label.lbl{font-size:12px; color:var(--sub);}
+  input[type=range].vol{accent-color:var(--accent2); vertical-align:middle;}
+  .stats{color:var(--sub); font-size:13px; margin-top:10px;}
+  .stats b{color:var(--text);}
+  canvas#timeline{
+    width:100%; height:130px; background:#0a0c12; border:1px solid var(--border);
+    border-radius:10px; display:block; margin-top:14px; cursor:pointer;
+  }
+  .scorechip{
+    display:none; align-items:center; gap:8px; margin-top:12px; font-size:13px;
+    background:var(--panel2); border:1px solid var(--border); border-radius:20px;
+    padding:6px 16px; width:fit-content;
+  }
+  .scorechip b{color:var(--ok); font-size:16px;}
+  canvas#stage{
+    width:100%; max-height:420px; background:#000; border-radius:10px; display:block;
+    margin-top:14px; object-fit:contain;
+  }
+  .progress{height:6px; background:var(--panel2); border-radius:3px; overflow:hidden; margin-top:12px; display:none;}
+  .progress .bar{height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .2s;}
+  .result{margin-top:14px; display:none;}
+  .result video{width:100%; max-height:420px; border-radius:10px; background:#000;}
+  .result .dl{display:inline-block; margin-top:10px; color:var(--ok); font-size:14px; text-decoration:none; border:1px solid var(--ok); border-radius:10px; padding:8px 18px;}
+  .hint{font-size:12px; color:var(--sub); margin-top:8px; line-height:1.7;}
+  .empty{color:var(--sub); font-size:13px; text-align:center; padding:8px;}
+  input[type=file]{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>音ハメVLOGメーカー<span class="dot">.</span></h1>
+  <p class="tagline">BGMの音の強弱を解析し、各クリップの「音が合う瞬間」を尺・再生速度(0.8〜1.3倍)込みで自動マッチング。すべてブラウザ内で完結・自動保存。</p>
+
+  <!-- クリップ -->
+  <section>
+    <h2>🎬 クリップ <span class="badge" id="clipCount">0本</span></h2>
+    <div class="dropzone" id="dropzone">動画ファイルをドロップ / クリックで選択（複数可）</div>
+    <input type="file" id="fileInput" accept="video/*" multiple>
+    <div class="clips" id="clipList"></div>
+    <div class="row" id="clipActions" style="margin-top:10px; display:none">
+      <button class="btn small" id="allAudOnBtn">🔊 全クリップ音声あり</button>
+      <button class="btn small" id="allAudOffBtn">🔇 全クリップ音声なし</button>
+      <button class="btn small" id="clearClipsBtn">🗑 クリップをすべて解除</button>
+    </div>
+    <p class="hint">切り出し位置や尺はアルゴリズムが決めるので、素材は長いままでOK。同じクリップの別シーンが複数回使われることもあります。🔊/🔇は書き出し動画にそのクリップの音を入れるかどうかです（解析には常に音を使います）。「順番通り」モードではサムネイルのドラッグ順が使われます。</p>
+  </section>
+
+  <!-- BGM -->
+  <section>
+    <h2>🎵 BGM</h2>
+    <div class="dropzone" id="bgmDrop">音楽ファイルをドロップ / クリックで選択</div>
+    <input type="file" id="bgmInput" accept="audio/*">
+    <div class="bgm-info" id="bgmInfo" style="display:none">
+      <span class="chip" id="bgmName"></span>
+      <span class="chip">テンポ <b id="bgmBpm">-</b> BPM</span>
+      <span class="chip">尺 <b id="bgmDur">-</b> 秒</span>
+      <button class="btn small" id="bgmRemove">BGMを外す</button>
+    </div>
+    <p class="hint">BGM全体（末尾の無音は自動カット）をクリップで埋めます。完成尺 = BGMの尺です。</p>
+  </section>
+
+  <!-- 音ハメ設計 -->
+  <section>
+    <h2>🧩 音ハメ設計</h2>
+    <div class="row">
+      <label class="lbl">クリップの並び
+        <select id="orderSel">
+          <option value="auto">自動で最適化（精度優先）</option>
+          <option value="fixed">登録した順番通り</option>
+        </select>
+      </label>
+      <label class="lbl">カットの細かさ
+        <select id="densitySel">
+          <option value="fine">細かめ</option>
+          <option value="std" selected>標準</option>
+          <option value="long">ゆったり</option>
+        </select>
+      </label>
+      <button class="btn primary" id="analyzeBtn">🔍 解析して音ハメ案を作成</button>
+    </div>
+    <div class="progress" id="anaProgress"><div class="bar" id="anaBar"></div></div>
+    <p class="stats" id="anaStatus"></p>
+    <div class="scorechip" id="scoreChip">音ハメ度 <b id="scoreVal">-</b><span id="segCount"></span></div>
+    <canvas id="timeline" height="130"></canvas>
+    <p class="hint">上段の色帯が各カット（数字=クリップ番号、×は再生速度）、下段の波形がBGMの音の強弱です。<b>カットをクリックすると別の候補（同スコア帯の別シーン/速度）に差し替え</b>できます。</p>
+  </section>
+
+  <!-- 書き出し -->
+  <section>
+    <h2>🎞️ プレビュー & 書き出し</h2>
+    <div class="row">
+      <label class="lbl">画面
+        <select id="aspectSel">
+          <option value="16:9">横 16:9</option>
+          <option value="9:16">縦 9:16</option>
+          <option value="1:1">正方形</option>
+        </select>
+      </label>
+      <label class="lbl">画質
+        <select id="resSel">
+          <option value="720">720p</option>
+          <option value="1080">1080p</option>
+        </select>
+      </label>
+      <label class="lbl">BGM音量 <input type="range" class="vol" id="bgmVol" min="0" max="150" value="100"> <span id="bgmVolLabel">100%</span></label>
+      <label class="lbl">クリップ音量 <input type="range" class="vol" id="clipVol" min="0" max="150" value="70"> <span id="clipVolLabel">70%</span></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="previewBtn">▶ プレビュー</button>
+      <button class="btn primary" id="exportBtn">⏺ 動画に書き出す</button>
+      <button class="btn small" id="stopBtn" style="display:none">■ 停止</button>
+    </div>
+    <canvas id="stage" width="1280" height="720"></canvas>
+    <div class="progress" id="progress"><div class="bar" id="progressBar"></div></div>
+    <div class="result" id="result">
+      <video id="resultVideo" controls playsinline></video><br>
+      <a class="dl" id="dlLink" download>⬇ ダウンロード</a>
+    </div>
+    <p class="hint">書き出しは実時間再生しながら録画します（完成尺と同じ時間がかかります）。書き出し中はタブを閉じたり切り替えたりしないでください。</p>
+  </section>
+</div>
+
+<script>
+"use strict";
+/* ================= IndexedDB ================= */
+const DB_NAME = "otohame-vlog", DB_VER = 1;
+let dbPromise = null;
+function db(){
+  if(!dbPromise){
+    dbPromise = new Promise((res, rej)=>{
+      const q = indexedDB.open(DB_NAME, DB_VER);
+      q.onupgradeneeded = ()=>{
+        const d = q.result;
+        if(!d.objectStoreNames.contains("clips")) d.createObjectStore("clips", {keyPath:"id"});
+        if(!d.objectStoreNames.contains("files")) d.createObjectStore("files", {keyPath:"id"});
+        if(!d.objectStoreNames.contains("envs"))  d.createObjectStore("envs", {keyPath:"id"});
+        if(!d.objectStoreNames.contains("meta"))  d.createObjectStore("meta");
+      };
+      q.onsuccess = ()=>res(q.result);
+      q.onerror   = ()=>rej(q.error);
+    });
+  }
+  return dbPromise;
+}
+async function idbPut(store, val, key){
+  const d = await db();
+  return new Promise((res, rej)=>{
+    const tx = d.transaction(store, "readwrite");
+    const q = key !== undefined ? tx.objectStore(store).put(val, key) : tx.objectStore(store).put(val);
+    tx.oncomplete = ()=>res(q.result);
+    tx.onerror = ()=>rej(tx.error);
+  });
+}
+async function idbGet(store, key){
+  const d = await db();
+  return new Promise((res, rej)=>{
+    const q = d.transaction(store).objectStore(store).get(key);
+    q.onsuccess = ()=>res(q.result);
+    q.onerror = ()=>rej(q.error);
+  });
+}
+async function idbAll(store){
+  const d = await db();
+  return new Promise((res, rej)=>{
+    const q = d.transaction(store).objectStore(store).getAll();
+    q.onsuccess = ()=>res(q.result);
+    q.onerror = ()=>rej(q.error);
+  });
+}
+async function idbDel(store, key){
+  const d = await db();
+  return new Promise((res, rej)=>{
+    const tx = d.transaction(store, "readwrite");
+    tx.objectStore(store).delete(key);
+    tx.oncomplete = ()=>res();
+    tx.onerror = ()=>rej(tx.error);
+  });
+}
+
+/* ================= 状態 ================= */
+const FPS = 50;                 // 包絡のフレームレート
+const RATES = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
+let clips = [];   // {id, fileId, name, blob, url, video, duration, audioOn, env, envReady}
+                  //   env = {z:Float32Array, n} … zはクリップ内z-score化した対数ラウドネス
+let bgm = null;   // {blob, name, bpm, beatInterval, firstBeat, buffer, rms, z, n, duration, effDur}
+let plan = null;  // {segs:[{t0, dur, cands:[{clipId, s, rate, corr, base}], pick}], score}
+let settings = {order:"auto", density:"std", aspect:"16:9", res:"720", bgmVol:100, clipVol:70};
+let audioCtx = null;
+let running = false, abortFlag = false, analyzing = false;
+
+const $ = id => document.getElementById(id);
+const stage = $("stage"), sctx = stage.getContext("2d");
+function raf(){ return new Promise(r => requestAnimationFrame(r)); }
+function yieldUI(){ return new Promise(r => setTimeout(r, 0)); }
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+function clipColor(i){ return `hsl(${(i*67)%360} 65% 58%)`; }
+
+/* ================= クリップ管理 ================= */
+function newId(){ return Date.now() + "_" + Math.random().toString(36).slice(2, 8); }
+async function addFiles(files){
+  for(const f of files){
+    if(!f.type.startsWith("video/")) continue;
+    const fileId = newId();
+    await idbPut("files", {id: fileId, blob: f, name: f.name});
+    const clip = {id: newId(), fileId, name: f.name, blob: f, duration: 0, audioOn: true, env: null, envReady: false};
+    clips.push(clip);
+    await prepareClip(clip);
+    await saveClip(clip);
+    renderClips();
+  }
+  invalidatePlan();
+  refreshStats();
+}
+const fileUrls = {};
+function prepareClip(clip){
+  return new Promise(res=>{
+    if(!fileUrls[clip.fileId]) fileUrls[clip.fileId] = URL.createObjectURL(clip.blob);
+    clip.url = fileUrls[clip.fileId];
+    const v = document.createElement("video");
+    v.src = clip.url;
+    v.muted = false;
+    v.playsInline = true;
+    v.preload = "auto";
+    v.crossOrigin = "anonymous";
+    clip.video = v;
+    v.addEventListener("loadedmetadata", ()=>{
+      clip.duration = v.duration || 0;
+      res();
+    }, {once:true});
+    v.addEventListener("error", ()=>res(), {once:true});
+  });
+}
+async function makeThumb(clip, time){
+  const v = clip.video;
+  if(!v || !clip.duration) return "";
+  await seekTo(v, Math.min(time, Math.max(0, clip.duration - 0.05)));
+  const c = document.createElement("canvas");
+  c.width = 240; c.height = 135;
+  drawCover(c.getContext("2d"), v, 240, 135);
+  return c.toDataURL("image/jpeg", 0.7);
+}
+function seekTo(v, t){
+  return new Promise(res=>{
+    if(Math.abs(v.currentTime - t) < 0.02 && v.readyState >= 2) return res();
+    const h = ()=>{ v.removeEventListener("seeked", h); res(); };
+    v.addEventListener("seeked", h);
+    try{ v.currentTime = t; }catch(e){ res(); }
+    setTimeout(res, 2000);
+  });
+}
+function drawCover(ctx, v, W, H){
+  const vw = v.videoWidth, vh = v.videoHeight;
+  if(!vw || !vh) return;
+  const s = Math.max(W/vw, H/vh);
+  const w = vw*s, h = vh*s;
+  ctx.drawImage(v, (W-w)/2, (H-h)/2, w, h);
+}
+async function saveClip(clip){
+  await idbPut("clips", {
+    id: clip.id, fileId: clip.fileId, name: clip.name,
+    order: clips.indexOf(clip), audioOn: clip.audioOn !== false
+  });
+}
+async function saveOrder(){ for(const c of clips) await saveClip(c); }
+async function removeClip(clip){
+  clips = clips.filter(c => c !== clip);
+  await idbDel("clips", clip.id);
+  if(!clips.some(c => c.fileId === clip.fileId)){
+    await idbDel("files", clip.fileId);
+    await idbDel("envs", clip.fileId);
+    if(fileUrls[clip.fileId]){
+      URL.revokeObjectURL(fileUrls[clip.fileId]);
+      delete fileUrls[clip.fileId];
+    }
+  }
+  invalidatePlan();
+  renderClips();
+  refreshStats();
+}
+
+/* ================= クリップUI ================= */
+let dragSrc = null;
+function renderClips(){
+  const list = $("clipList");
+  list.innerHTML = "";
+  clips.forEach((clip, i)=>{
+    const card = document.createElement("div");
+    card.className = "clip";
+    card.innerHTML = `
+      <div class="thumbwrap" draggable="true" title="ドラッグで並べ替え（「順番通り」モードで有効）">
+        <img alt="">
+        <span class="num">${i+1}</span>
+        <button class="del" title="削除">✕</button>
+      </div>
+      <div class="body">
+        <div class="name">${escapeHtml(clip.name)}</div>
+        <div class="meta"><span>${clip.duration ? clip.duration.toFixed(1)+"秒" : "読込中…"}</span><span class="envstat"></span></div>
+        <div class="ctrlrow"><button class="aud"></button></div>
+      </div>`;
+    card.querySelector(".num").style.borderLeftColor = clipColor(i);
+    const img = card.querySelector("img");
+    if(clip.thumbCache) img.src = clip.thumbCache;
+    else makeThumb(clip, Math.min(1, clip.duration/2)).then(u=>{ clip.thumbCache = u; img.src = u; });
+
+    const envstat = card.querySelector(".envstat");
+    if(clip.envReady) envstat.innerHTML = clip.env ? `<span class="envok">音声解析OK</span>` : `<span class="envng">音声なし</span>`;
+
+    card.querySelector(".del").addEventListener("click", e=>{
+      e.stopPropagation();
+      removeClip(clip);
+    });
+    const audBtn = card.querySelector(".aud");
+    const updAud = ()=>{
+      audBtn.textContent = clip.audioOn ? "🔊 音声あり" : "🔇 音声なし";
+      audBtn.classList.toggle("off", !clip.audioOn);
+    };
+    updAud();
+    audBtn.addEventListener("click", ()=>{
+      clip.audioOn = !clip.audioOn;
+      updAud();
+      saveClip(clip);
+    });
+
+    const thumbwrap = card.querySelector(".thumbwrap");
+    thumbwrap.addEventListener("dragstart", ()=>{
+      card.classList.add("dragging");
+      dragSrc = clip;
+    });
+    thumbwrap.addEventListener("dragend", ()=>{
+      card.classList.remove("dragging");
+      dragSrc = null;
+      saveOrder();
+      invalidatePlan();
+      renderClips();
+    });
+    card.addEventListener("dragover", e=>{
+      e.preventDefault();
+      if(!dragSrc || dragSrc === clip) return;
+      const from = clips.indexOf(dragSrc), to = clips.indexOf(clip);
+      clips.splice(from, 1);
+      clips.splice(to, 0, dragSrc);
+    });
+    list.appendChild(card);
+  });
+  if(!clips.length){
+    list.innerHTML = `<p class="empty" style="grid-column:1/-1">まだクリップがありません</p>`;
+  }
+}
+function refreshStats(){
+  $("clipCount").textContent = clips.length + "本";
+  $("clipActions").style.display = clips.length ? "" : "none";
+}
+
+/* ================= ラウドネス包絡 =================
+   50fpsのRMS → 対数 → ソース内z-score。
+   「そのソースの中で相対的にどれくらい大きい瞬間か」を表す。 */
+function envelopeFromBuffer(buffer){
+  const sr = buffer.sampleRate, hop = Math.max(1, Math.round(sr / FPS));
+  const n = Math.max(1, Math.floor(buffer.length / hop));
+  const ch0 = buffer.getChannelData(0);
+  const ch1 = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : null;
+  const rms = new Float32Array(n);
+  for(let i=0; i<n; i++){
+    let s = 0;
+    const base = i * hop;
+    for(let j=0; j<hop; j++){
+      let x = ch0[base+j];
+      if(ch1) x = (x + ch1[base+j]) * 0.5;
+      s += x*x;
+    }
+    rms[i] = Math.sqrt(s / hop);
+  }
+  const lg = new Float32Array(n);
+  let mean = 0;
+  for(let i=0; i<n; i++){ lg[i] = Math.log10(rms[i] + 1e-5); mean += lg[i]; }
+  mean /= n;
+  let vari = 0;
+  for(let i=0; i<n; i++){ const d = lg[i]-mean; vari += d*d; }
+  const std = Math.sqrt(vari / n) || 1e-4;
+  const z = new Float32Array(n);
+  for(let i=0; i<n; i++) z[i] = (lg[i]-mean) / std;
+  return {rms, z, n};
+}
+async function decodeAudio(blob){
+  const arr = await blob.arrayBuffer();
+  const octx = new OfflineAudioContext(1, 1, 22050);
+  return octx.decodeAudioData(arr);
+}
+// クリップの包絡を用意（IndexedDBキャッシュ付き）
+async function ensureClipEnv(clip){
+  if(clip.envReady) return;
+  const cached = await idbGet("envs", clip.fileId);
+  if(cached && cached.z){
+    clip.env = {z: cached.z, n: cached.z.length};
+    clip.envReady = true;
+    return;
+  }
+  try{
+    const buf = await decodeAudio(clip.blob);
+    const e = envelopeFromBuffer(buf);
+    // ほぼ無音のクリップは「音声なし」と同等に扱う
+    let mx = 0;
+    for(let i=0; i<e.n; i++) if(e.rms[i] > mx) mx = e.rms[i];
+    clip.env = mx > 1e-4 ? {z: e.z, n: e.n} : null;
+  }catch(err){
+    clip.env = null; // 音声トラックなし or デコード不可
+  }
+  clip.envReady = true;
+  await idbPut("envs", {id: clip.fileId, z: clip.env ? clip.env.z : null});
+}
+
+/* ================= BGM & ビート検出 ================= */
+async function setBgm(file){
+  $("bgmName").textContent = "解析中…";
+  $("bgmInfo").style.display = "flex";
+  let buffer;
+  try{
+    buffer = await decodeAudio(file);
+  }catch(e){
+    alert("この音声ファイルは読み込めませんでした: " + e.message);
+    $("bgmInfo").style.display = "none";
+    return;
+  }
+  const env = envelopeFromBuffer(buffer);
+  // 末尾の無音をカット
+  let mx = 0;
+  for(let i=0; i<env.n; i++) if(env.rms[i] > mx) mx = env.rms[i];
+  let last = env.n - 1;
+  while(last > 0 && env.rms[last] < mx * 0.02) last--;
+  const effDur = Math.min(buffer.duration, (last + 1) / FPS + 0.15);
+  const beat = detectBeats(env);
+  bgm = {blob: file, name: file.name, buffer,
+         rms: env.rms, z: env.z, n: env.n,
+         duration: buffer.duration, effDur, ...beat};
+  $("bgmName").textContent = "🎵 " + file.name;
+  $("bgmBpm").textContent = Math.round(beat.bpm);
+  $("bgmDur").textContent = effDur.toFixed(1);
+  await idbPut("meta", {blob: file, name: file.name}, "bgm");
+  invalidatePlan();
+  renderTimeline();
+}
+function detectBeats(env){
+  const n = env.n;
+  // オンセット（RMS増分）
+  const flux = new Float32Array(n);
+  for(let i=1; i<n; i++) flux[i] = Math.max(0, env.rms[i] - env.rms[i-1]);
+  // 自己相関でテンポ推定（55〜200 BPM）
+  const minLag = Math.round(FPS * 60 / 200);
+  const maxLag = Math.min(n - 1, Math.round(FPS * 60 / 55));
+  let bestLag = Math.round(FPS * 0.5), best = -1;
+  for(let lag = minLag; lag <= maxLag; lag++){
+    let s = 0;
+    for(let i=0; i<n-lag; i++) s += flux[i] * flux[i+lag];
+    s /= (n - lag);
+    if(s > best){ best = s; bestLag = lag; }
+  }
+  const beatInterval = bestLag / FPS;
+  const bpm = 60 / beatInterval;
+  // 最初のビート位相（コムフィルタ）
+  let bestPhase = 0, bestSum = -1;
+  for(let p=0; p<bestLag; p++){
+    let s = 0, cnt = 0;
+    for(let i=p; i<n; i+=bestLag){ s += flux[i]; cnt++; }
+    if(cnt && s/cnt > bestSum){ bestSum = s/cnt; bestPhase = p; }
+  }
+  return {bpm, beatInterval, firstBeat: bestPhase / FPS};
+}
+async function removeBgm(){
+  bgm = null;
+  $("bgmInfo").style.display = "none";
+  await idbDel("meta", "bgm");
+  invalidatePlan();
+  renderTimeline();
+}
+
+/* ================= セグメント分割 =================
+   ビートグリッドに沿って可変長のカット割りを作る。
+   音が盛り上がっている所は短く、静かな所は長く。 */
+function meanZ(t0, t1){
+  const f0 = Math.max(0, Math.round(t0 * FPS));
+  const f1 = Math.min(bgm.n, Math.max(f0 + 1, Math.round(t1 * FPS)));
+  let s = 0;
+  for(let i=f0; i<f1; i++) s += bgm.z[i];
+  return s / (f1 - f0);
+}
+function buildSegments(){
+  const bi = bgm.beatInterval;
+  const range = {fine:[0.30, 0.85], std:[0.45, 1.6], long:[0.8, 2.8]}[settings.density];
+  let nMin = Math.max(1, Math.ceil(range[0] / bi));
+  let nMax = Math.max(nMin, Math.floor(range[1] / bi));
+  const nMid = Math.max(nMin, Math.round((nMin + nMax) / 2));
+  const end = bgm.effDur;
+  const segs = [];
+  let t = 0;
+  // 最初のビートまでのイントロが長ければ1カットにする
+  if(bgm.firstBeat > 0.25 && bgm.firstBeat < end){
+    segs.push({t0: 0, dur: bgm.firstBeat});
+    t = bgm.firstBeat;
+  }
+  while(t < end - 0.2){
+    const e = meanZ(t, Math.min(end, t + bi * 2));
+    const nB = e > 0.35 ? nMin : (e < -0.35 ? nMax : nMid);
+    let dur = nB * bi;
+    if(t + dur > end || end - (t + dur) < 0.18) dur = end - t;
+    segs.push({t0: t, dur});
+    t += dur;
+  }
+  if(!segs.length) segs.push({t0: 0, dur: end});
+  return segs;
+}
+
+/* ================= マッチング最適化 =================
+   各セグメントについて (クリップ, 開始位置, 速度) を総当りし、
+   BGMのz包絡との形状相関 + レベル一致でスコアリング。 */
+function resampleNorm(src, f0, f1, L){
+  // src[f0..f1) を長さLに線形リサンプル → 平均0・Σx²=L に正規化
+  const out = new Float32Array(L);
+  const span = Math.max(1, f1 - f0 - 1);
+  for(let k=0; k<L; k++){
+    const pos = f0 + (L === 1 ? 0 : k * span / (L - 1));
+    const i = Math.min(f1 - 2, Math.floor(pos));
+    const fr = pos - i;
+    out[k] = src[Math.max(0,i)] * (1 - fr) + src[Math.min(f1-1, i+1)] * fr;
+  }
+  let m = 0;
+  for(let k=0; k<L; k++) m += out[k];
+  m /= L;
+  let v = 0;
+  for(let k=0; k<L; k++){ out[k] -= m; v += out[k]*out[k]; }
+  const s = Math.sqrt(v / L);
+  if(s < 1e-4) return null; // 平坦（無音区間など）→ 形状情報なし
+  for(let k=0; k<L; k++) out[k] /= s;
+  return out;
+}
+function overlapFrac(ranges, a, b){
+  let ov = 0;
+  for(const r of ranges){
+    const lo = Math.max(a, r[0]), hi = Math.min(b, r[1]);
+    if(hi > lo) ov += hi - lo;
+  }
+  return Math.min(1, ov / Math.max(0.01, b - a));
+}
+function invalidatePlan(){
+  plan = null;
+  $("scoreChip").style.display = "none";
+  $("anaStatus").textContent = "";
+  idbDel("meta", "plan").catch(()=>{});
+  renderTimeline();
+}
+async function analyze(){
+  if(analyzing || running) return;
+  if(!clips.length){ alert("クリップを追加してください。"); return; }
+  if(!bgm){ alert("BGMを追加してください。"); return; }
+  analyzing = true;
+  $("analyzeBtn").disabled = true;
+  $("anaProgress").style.display = "block";
+  $("anaBar").style.width = "0%";
+  try{
+    // 1) 全クリップの包絡を用意
+    for(let i=0; i<clips.length; i++){
+      $("anaStatus").textContent = `クリップ音声を解析中… (${i+1}/${clips.length})`;
+      await ensureClipEnv(clips[i]);
+      $("anaBar").style.width = (30 * (i+1) / clips.length) + "%";
+      await yieldUI();
+    }
+    renderClips();
+    const usable = clips.filter(c => c.env);
+    // 2) セグメント分割
+    const segs = buildSegments();
+    // 3) 各セグメントに最適な (クリップ, 窓, 速度) を割り当て
+    const P1 = new Map(), P2 = new Map(); // 累積和（平均・分散を O(1) で出すため）
+    for(const c of usable){
+      const n = c.env.n, z = c.env.z;
+      const p1 = new Float64Array(n+1), p2 = new Float64Array(n+1);
+      for(let i=0; i<n; i++){ p1[i+1] = p1[i] + z[i]; p2[i+1] = p2[i] + z[i]*z[i]; }
+      P1.set(c.id, p1); P2.set(c.id, p2);
+    }
+    const used = new Map(); // clipId -> 使用済みソース区間 [[a,b],...]
+    let prevClip = null, rrIdx = 0;
+    const stride = Math.max(1, Math.round(FPS * 0.08)); // 窓探索の刻み ≈0.08秒
+    for(let j=0; j<segs.length; j++){
+      const seg = segs[j];
+      const f0 = Math.round(seg.t0 * FPS);
+      const f1 = Math.min(bgm.n, Math.max(f0 + 2, Math.round((seg.t0 + seg.dur) * FPS)));
+      let muB = 0;
+      for(let i=f0; i<f1; i++) muB += bgm.z[i];
+      muB /= (f1 - f0);
+      // 探索対象クリップ（順番通りモードでは割当クリップのみ）
+      let targets = usable;
+      if(settings.order === "fixed" && clips.length){
+        const c = clips[Math.floor(j * clips.length / segs.length)] || clips[clips.length-1];
+        targets = c.env ? [c] : [];
+      }
+      const cands = [];
+      for(const rate of RATES){
+        const L = Math.max(4, Math.round(seg.dur * rate * FPS));
+        const x = resampleNorm(bgm.z, f0, f1, L);
+        for(const c of targets){
+          const z = c.env.z, n = c.env.n;
+          if(n < L) continue;
+          const p1 = P1.get(c.id), p2 = P2.get(c.id);
+          for(let s=0; s + L <= n; s += stride){
+            const meanY = (p1[s+L] - p1[s]) / L;
+            const varY = Math.max(1e-6, (p2[s+L] - p2[s]) / L - meanY*meanY);
+            let corr = 0;
+            if(x){
+              let dot = 0;
+              for(let k=0; k<L; k++) dot += x[k] * z[s+k];
+              corr = (dot / L - 0) / Math.sqrt(varY); // Σx=0 なので dot/L = cov
+              corr = Math.max(-1, Math.min(1, corr));
+            }
+            const lvl = 1 - Math.min(1, Math.abs(muB - meanY) / 1.5);
+            const base = 0.72 * corr + 0.28 * lvl;
+            cands.push({clipId: c.id, s: s / FPS, rate, corr, base});
+          }
+        }
+      }
+      cands.sort((a,b)=>b.base - a.base);
+      // 近接重複を除いて上位8候補を保持
+      const top = [];
+      for(const cand of cands){
+        if(top.length >= 8) break;
+        if(top.some(t => t.clipId === cand.clipId && Math.abs(t.s - cand.s) < 0.4)) continue;
+        top.push(cand);
+      }
+      if(!top.length){
+        // 音声解析できたクリップがない / 全クリップが短すぎる → ラウンドロビンで埋める
+        const c = usable.length ? usable[rrIdx % usable.length] : clips[rrIdx % clips.length];
+        rrIdx++;
+        const need = seg.dur * 0.8;
+        const s = Math.max(0, Math.min(c.duration - need, (j * 1.7) % Math.max(0.1, c.duration - need)));
+        top.push({clipId: c.id, s, rate: 0.8, corr: 0, base: 0});
+      }
+      // ペナルティ（同一クリップ連続 / 使用済み区間との重複）を加味して選択
+      let pick = 0, bestEff = -1e9;
+      for(let k=0; k<top.length; k++){
+        const cand = top[k];
+        let pen = 0;
+        if(settings.order === "auto" && cand.clipId === prevClip) pen += 0.12;
+        const ranges = used.get(cand.clipId) || [];
+        pen += 0.3 * overlapFrac(ranges, cand.s, cand.s + seg.dur * cand.rate);
+        const eff = cand.base - pen;
+        if(eff > bestEff){ bestEff = eff; pick = k; }
+      }
+      seg.cands = top;
+      seg.pick = pick;
+      const ch = top[pick];
+      if(!used.has(ch.clipId)) used.set(ch.clipId, []);
+      used.get(ch.clipId).push([ch.s, ch.s + seg.dur * ch.rate]);
+      prevClip = ch.clipId;
+      $("anaStatus").textContent = `音ハメ最適化中… (${j+1}/${segs.length})`;
+      $("anaBar").style.width = (30 + 70 * (j+1) / segs.length) + "%";
+      await yieldUI();
+    }
+    plan = {segs};
+    updateScore();
+    await savePlan();
+    $("anaStatus").textContent = `完了: ${segs.length}カット / 完成尺 ${bgm.effDur.toFixed(1)}秒`;
+    renderTimeline();
+  } finally {
+    analyzing = false;
+    $("analyzeBtn").disabled = false;
+    $("anaProgress").style.display = "none";
+  }
+}
+function updateScore(){
+  if(!plan){ $("scoreChip").style.display = "none"; return; }
+  let s = 0;
+  for(const seg of plan.segs) s += Math.max(0, seg.cands[seg.pick].corr);
+  const score = Math.round(100 * s / plan.segs.length);
+  $("scoreVal").textContent = score + "%";
+  $("segCount").textContent = `（${plan.segs.length}カット）`;
+  $("scoreChip").style.display = "flex";
+}
+async function savePlan(){
+  if(!plan) return;
+  await idbPut("meta", {
+    segs: plan.segs.map(s => ({t0: s.t0, dur: s.dur, cands: s.cands, pick: s.pick}))
+  }, "plan");
+}
+
+/* ================= タイムライン表示 ================= */
+function renderTimeline(){
+  const cv = $("timeline");
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth * dpr, H = 130 * dpr;
+  if(cv.width !== W) cv.width = W;
+  if(cv.height !== H) cv.height = H;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, W, H);
+  if(!bgm){
+    ctx.fillStyle = "#8b93a7";
+    ctx.font = `${12*dpr}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText("BGMを追加して「解析」を押すと、ここに音ハメ案が表示されます", W/2, H/2);
+    return;
+  }
+  const dur = bgm.effDur;
+  const bandH = 30 * dpr, waveTop = bandH + 6 * dpr;
+  // BGM波形（RMS包絡）
+  let mx = 0;
+  const nEff = Math.min(bgm.n, Math.round(dur * FPS));
+  for(let i=0; i<nEff; i++) if(bgm.rms[i] > mx) mx = bgm.rms[i];
+  ctx.fillStyle = "rgba(92,200,255,.45)";
+  const waveH = H - waveTop;
+  for(let px=0; px<W; px++){
+    const i = Math.min(nEff-1, Math.floor(px / W * nEff));
+    let peak = 0;
+    const i2 = Math.min(nEff, Math.floor((px+1) / W * nEff) + 1);
+    for(let k=i; k<i2; k++) if(bgm.rms[k] > peak) peak = bgm.rms[k];
+    const h = Math.max(1, peak / (mx || 1) * waveH);
+    ctx.fillRect(px, H - h, 1, h);
+  }
+  // セグメント帯
+  if(plan){
+    ctx.font = `${10*dpr}px sans-serif`;
+    ctx.textAlign = "left";
+    for(const seg of plan.segs){
+      const x0 = seg.t0 / dur * W;
+      const x1 = (seg.t0 + seg.dur) / dur * W;
+      const ch = seg.cands[seg.pick];
+      const ci = clips.findIndex(c => c.id === ch.clipId);
+      ctx.fillStyle = ci >= 0 ? clipColor(ci) : "#555";
+      ctx.fillRect(x0 + 1, 0, Math.max(1, x1 - x0 - 2), bandH);
+      // 境界線を波形部分にも
+      ctx.fillStyle = "rgba(255,255,255,.25)";
+      ctx.fillRect(x0, 0, 1, H);
+      // ラベル
+      if(x1 - x0 > 26 * dpr){
+        ctx.fillStyle = "rgba(0,0,0,.75)";
+        ctx.fillText(`${ci+1}`, x0 + 4*dpr, 12*dpr);
+        ctx.fillText(`×${ch.rate.toFixed(1)}`, x0 + 4*dpr, 24*dpr);
+      }
+    }
+  }
+}
+$("timeline").addEventListener("click", e=>{
+  if(!plan || !bgm || running || analyzing) return;
+  const rect = $("timeline").getBoundingClientRect();
+  const t = (e.clientX - rect.left) / rect.width * bgm.effDur;
+  const seg = plan.segs.find(s => t >= s.t0 && t < s.t0 + s.dur);
+  if(!seg || seg.cands.length < 2) return;
+  seg.pick = (seg.pick + 1) % seg.cands.length;
+  updateScore();
+  savePlan();
+  renderTimeline();
+});
+window.addEventListener("resize", renderTimeline);
+
+/* ================= 再生 / 書き出し ================= */
+function ensureAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if(audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+function setupStage(){
+  const [aw, ah] = settings.aspect === "16:9" ? [16,9] : settings.aspect === "9:16" ? [9,16] : [1,1];
+  const base = settings.res === "1080" ? 1080 : 720;
+  let W, H;
+  if(aw >= ah){ H = base; W = Math.round(base * aw / ah); }
+  else{ W = base; H = Math.round(base * ah / aw); }
+  W += W % 2; H += H % 2;
+  stage.width = W; stage.height = H;
+  return [W, H];
+}
+function pickMime(){
+  const cands = [
+    'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+    "video/mp4",
+    'video/webm;codecs="vp9,opus"',
+    "video/webm"
+  ];
+  for(const m of cands){
+    if(MediaRecorder.isTypeSupported(m)) return m;
+  }
+  return "";
+}
+async function runSequence(record){
+  if(running || analyzing) return;
+  if(!plan){ alert("先に「解析して音ハメ案を作成」を実行してください。"); return; }
+  if(!bgm){ alert("BGMを追加してください。"); return; }
+  running = true; abortFlag = false;
+  $("previewBtn").disabled = true;
+  $("exportBtn").disabled = true;
+  $("analyzeBtn").disabled = true;
+  $("stopBtn").style.display = "";
+  $("result").style.display = "none";
+  $("progress").style.display = "block";
+  $("progressBar").style.width = "0%";
+
+  const [W, H] = setupStage();
+  const segs = plan.segs;
+  const total = bgm.effDur;
+  const actx = ensureAudio();
+  const byId = new Map(clips.map(c => [c.id, c]));
+
+  // オーディオ配線
+  const master = actx.createGain();
+  master.connect(actx.destination);
+  let msDest = null, recorder = null, chunks = [];
+  if(record){
+    msDest = actx.createMediaStreamDestination();
+    master.connect(msDest);
+    const stream = new MediaStream([
+      ...stage.captureStream(30).getVideoTracks(),
+      ...msDest.stream.getAudioTracks()
+    ]);
+    recorder = new MediaRecorder(stream, {
+      mimeType: pickMime(),
+      videoBitsPerSecond: settings.res === "1080" ? 12_000_000 : 8_000_000
+    });
+    recorder.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
+  }
+  const clipGain = actx.createGain();
+  clipGain.gain.value = settings.clipVol / 100;
+  clipGain.connect(master);
+  for(const c of clips){
+    if(!c.srcNode){
+      try{ c.srcNode = actx.createMediaElementSource(c.video); }catch(e){ /* 作成済み */ }
+    }
+    if(c.srcNode){
+      try{ c.srcNode.disconnect(); }catch(e){}
+      c.srcNode.connect(clipGain);
+    }
+  }
+  // BGM
+  const bgmSrc = actx.createBufferSource();
+  bgmSrc.buffer = bgm.buffer;
+  const bgmG = actx.createGain();
+  bgmG.gain.value = settings.bgmVol / 100;
+  bgmSrc.connect(bgmG); bgmG.connect(master);
+
+  // 先頭セグメントを事前シーク
+  const first = segs[0].cands[segs[0].pick];
+  const firstClip = byId.get(first.clipId);
+  if(firstClip){
+    firstClip.video.playbackRate = first.rate;
+    try{ firstClip.video.preservesPitch = true; }catch(e){}
+    await seekTo(firstClip.video, first.s);
+  }
+
+  try{
+    if(recorder) recorder.start(250);
+    const t0 = actx.currentTime + 0.08;
+    bgmSrc.start(t0, 0);
+    const fade = Math.min(1.2, total * 0.2);
+    bgmG.gain.setValueAtTime(settings.bgmVol / 100, t0 + total - fade);
+    bgmG.gain.linearRampToValueAtTime(0.0001, t0 + total);
+    while(actx.currentTime < t0){ await raf(); }
+
+    let acc = 0;
+    for(let i=0; i<segs.length; i++){
+      if(abortFlag) break;
+      const seg = segs[i];
+      const ch = seg.cands[seg.pick];
+      const clip = byId.get(ch.clipId);
+      if(!clip){ acc += seg.dur; continue; }
+      const v = clip.video;
+      v.playbackRate = ch.rate;
+      try{ v.preservesPitch = true; }catch(e){}
+      v.muted = !clip.audioOn;
+      if(Math.abs(v.currentTime - ch.s) > 0.05) await seekTo(v, ch.s);
+      try{ await v.play(); }catch(e){}
+      // 次セグメントを先読みシーク（別のクリップのときだけ）
+      if(i + 1 < segs.length){
+        const nx = segs[i+1].cands[segs[i+1].pick];
+        const nclip = byId.get(nx.clipId);
+        if(nclip && nclip !== clip){
+          nclip.video.playbackRate = nx.rate;
+          try{ nclip.video.preservesPitch = true; }catch(e){}
+          seekTo(nclip.video, nx.s);
+        }
+      }
+      const segEnd = t0 + acc + seg.dur;
+      acc += seg.dur;
+      while(actx.currentTime < segEnd && !abortFlag){
+        drawCover(sctx, v, W, H);
+        $("progressBar").style.width = Math.min(100, (actx.currentTime - t0) / total * 100) + "%";
+        await raf();
+      }
+      v.pause();
+    }
+  } finally {
+    try{ bgmSrc.stop(); }catch(e){}
+    for(const c of clips){ try{ c.video.pause(); }catch(e){} }
+    if(recorder && recorder.state !== "inactive"){
+      const done = new Promise(res => recorder.onstop = res);
+      recorder.stop();
+      await done;
+    }
+    running = false;
+    $("previewBtn").disabled = false;
+    $("exportBtn").disabled = false;
+    $("analyzeBtn").disabled = false;
+    $("stopBtn").style.display = "none";
+    $("progress").style.display = "none";
+  }
+
+  if(record && chunks.length && !abortFlag){
+    const mime = recorder.mimeType || pickMime();
+    const ext = mime.includes("mp4") ? "mp4" : "webm";
+    const blob = new Blob(chunks, {type: mime});
+    const url = URL.createObjectURL(blob);
+    $("resultVideo").src = url;
+    const d = new Date();
+    $("dlLink").href = url;
+    $("dlLink").download = `otohame-vlog_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.${ext}`;
+    $("result").style.display = "block";
+    $("result").scrollIntoView({behavior:"smooth"});
+  }
+}
+
+/* ================= イベント ================= */
+$("dropzone").addEventListener("click", ()=>$("fileInput").click());
+$("fileInput").addEventListener("change", e=>{ addFiles([...e.target.files]); e.target.value = ""; });
+$("dropzone").addEventListener("dragover", e=>{ e.preventDefault(); $("dropzone").classList.add("over"); });
+$("dropzone").addEventListener("dragleave", ()=>$("dropzone").classList.remove("over"));
+$("dropzone").addEventListener("drop", e=>{
+  e.preventDefault();
+  $("dropzone").classList.remove("over");
+  addFiles([...e.dataTransfer.files]);
+});
+function setAllAudio(on){
+  for(const c of clips){ c.audioOn = on; saveClip(c); }
+  renderClips();
+}
+$("allAudOnBtn").addEventListener("click", ()=>setAllAudio(true));
+$("allAudOffBtn").addEventListener("click", ()=>setAllAudio(false));
+$("clearClipsBtn").addEventListener("click", async ()=>{
+  if(!clips.length) return;
+  if(!confirm(`${clips.length}本のクリップをすべて解除します。よろしいですか？`)) return;
+  const fileIds = new Set(clips.map(c => c.fileId));
+  for(const c of clips) await idbDel("clips", c.id);
+  for(const fid of fileIds){
+    await idbDel("files", fid);
+    await idbDel("envs", fid);
+    if(fileUrls[fid]){ URL.revokeObjectURL(fileUrls[fid]); delete fileUrls[fid]; }
+  }
+  clips = [];
+  invalidatePlan();
+  renderClips();
+  refreshStats();
+});
+$("bgmDrop").addEventListener("click", ()=>$("bgmInput").click());
+$("bgmDrop").addEventListener("dragover", e=>{ e.preventDefault(); $("bgmDrop").classList.add("over"); });
+$("bgmDrop").addEventListener("dragleave", ()=>$("bgmDrop").classList.remove("over"));
+$("bgmDrop").addEventListener("drop", e=>{
+  e.preventDefault();
+  $("bgmDrop").classList.remove("over");
+  const f = [...e.dataTransfer.files].find(f => f.type.startsWith("audio/"));
+  if(f) setBgm(f);
+});
+$("bgmInput").addEventListener("change", e=>{
+  if(e.target.files[0]) setBgm(e.target.files[0]);
+  e.target.value = "";
+});
+$("bgmRemove").addEventListener("click", removeBgm);
+function saveSettings(){ idbPut("meta", settings, "settings"); }
+$("orderSel").addEventListener("change", e=>{
+  settings.order = e.target.value;
+  saveSettings();
+  invalidatePlan();
+});
+$("densitySel").addEventListener("change", e=>{
+  settings.density = e.target.value;
+  saveSettings();
+  invalidatePlan();
+});
+$("aspectSel").addEventListener("change", e=>{
+  settings.aspect = e.target.value;
+  saveSettings();
+  setupStage();
+});
+$("resSel").addEventListener("change", e=>{
+  settings.res = e.target.value;
+  saveSettings();
+});
+$("bgmVol").addEventListener("input", e=>{
+  settings.bgmVol = parseInt(e.target.value, 10);
+  $("bgmVolLabel").textContent = settings.bgmVol + "%";
+  saveSettings();
+});
+$("clipVol").addEventListener("input", e=>{
+  settings.clipVol = parseInt(e.target.value, 10);
+  $("clipVolLabel").textContent = settings.clipVol + "%";
+  saveSettings();
+});
+$("analyzeBtn").addEventListener("click", analyze);
+$("previewBtn").addEventListener("click", ()=>runSequence(false));
+$("exportBtn").addEventListener("click", ()=>runSequence(true));
+$("stopBtn").addEventListener("click", ()=>{ abortFlag = true; });
+
+/* ================= 復元 ================= */
+(async function restore(){
+  try{
+    const saved = await idbGet("meta", "settings");
+    if(saved) settings = Object.assign(settings, saved);
+    $("orderSel").value = settings.order;
+    $("densitySel").value = settings.density;
+    $("aspectSel").value = settings.aspect;
+    $("resSel").value = settings.res;
+    $("bgmVol").value = settings.bgmVol;
+    $("bgmVolLabel").textContent = settings.bgmVol + "%";
+    $("clipVol").value = settings.clipVol;
+    $("clipVolLabel").textContent = settings.clipVol + "%";
+
+    const fmap = new Map((await idbAll("files")).map(f => [f.id, f]));
+    const rows = (await idbAll("clips")).sort((a,b)=>(a.order||0)-(b.order||0));
+    for(const r of rows){
+      const f = fmap.get(r.fileId);
+      if(!f || !f.blob){ await idbDel("clips", r.id); continue; }
+      const clip = {
+        id: r.id, fileId: r.fileId, name: r.name, blob: f.blob,
+        duration: 0, audioOn: r.audioOn !== false, env: null, envReady: false
+      };
+      clips.push(clip);
+      await prepareClip(clip);
+    }
+    const savedBgm = await idbGet("meta", "bgm");
+    if(savedBgm && savedBgm.blob){
+      await setBgm(new File([savedBgm.blob], savedBgm.name || "bgm", {type: savedBgm.blob.type}));
+      // setBgm は plan を破棄するので、その後に保存済みプランを復元する
+      const savedPlan = await idbGet("meta", "plan");
+      if(savedPlan && savedPlan.segs && savedPlan.segs.length){
+        const ids = new Set(clips.map(c => c.id));
+        const ok = savedPlan.segs.every(s => s.cands && s.cands.length && ids.has(s.cands[s.pick].clipId));
+        if(ok){
+          plan = {segs: savedPlan.segs};
+          updateScore();
+          $("anaStatus").textContent = `保存済みの音ハメ案: ${plan.segs.length}カット / 完成尺 ${bgm.effDur.toFixed(1)}秒`;
+        }
+      }
+    }
+  }catch(e){
+    console.warn("復元エラー", e);
+  }
+  renderClips();
+  refreshStats();
+  setupStage();
+  renderTimeline();
+})();
+</script>
+</body>
+</html>

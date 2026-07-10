@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BDO Kill Montage Maker v2</title>
+<link rel="stylesheet" href="../Style/common.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 var(--pt-font)}
+header{padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+header h1{font-size:15px;margin:0;font-weight:600}
+main{display:flex;gap:12px;padding:12px;align-items:flex-start}
+#left{flex:1;min-width:0;position:sticky;top:12px;align-self:flex-start}
+#panel{width:430px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.card h2{font-size:13px;margin:0 0 8px;color:var(--acc);font-weight:600}
+.card .hint{color:var(--dim);font-size:12px;margin:4px 0}
+button{background:var(--pt-btn);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px}
+button:hover{background:var(--pt-btn-hover)}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.1)}
+button.on{background:#d9efe2;border-color:var(--ok)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0}
+label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);margin:4px 0}
+label.sl input[type=range]{flex:1}
+label.sl .val{width:56px;text-align:right;color:var(--fg);font-family:var(--pt-mono)}
+select,input[type=text],input[type=number]{font-size:13px;background:var(--pt-field);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:3px 6px}
+#videoWrap{position:relative;background:#000;border-radius:8px;overflow:hidden;min-height:200px}
+#videoWrap video{display:none;width:100%;max-height:56vh;background:#000}
+#noVid{padding:70px 20px;text-align:center;color:var(--dim)}
+#beatDot{position:absolute;right:10px;top:10px;width:14px;height:14px;border-radius:50%;background:#b7afcc;z-index:5}
+#beatDot.b{background:var(--beat)}
+#beatDot.d{background:var(--bar);box-shadow:0 0 10px var(--bar)}
+#mtl{width:100%;height:64px;display:block;margin-top:8px;background:var(--pt-canvas);border:1px solid var(--line);border-radius:8px;cursor:pointer}
+#transport{display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap}
+#tdisp{font-family:var(--pt-mono);font-size:13px;color:var(--dim)}
+#wave{width:100%;height:80px;display:block;background:var(--pt-canvas);border:1px solid var(--line);border-radius:6px;cursor:crosshair}
+.status{font-size:12px;color:var(--dim);min-height:16px;margin-top:4px;white-space:pre-line}
+.ok{color:var(--ok)}
+.warn{color:var(--warn)}
+.mat{display:flex;align-items:center;gap:8px;padding:5px 6px;border-bottom:1px solid var(--pt-line-soft);font-size:12px}
+.mat .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mat .k{color:var(--kill);font-weight:600}
+.clip{display:flex;align-items:center;gap:6px;padding:5px 6px;border-bottom:1px solid var(--pt-line-soft);font-size:12px;cursor:pointer}
+.clip:hover{background:var(--pt-hover)}
+.clip.off{opacity:.4}
+.clip .t{font-family:var(--pt-mono);width:64px}
+.clip .nm{flex:1;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clip .w{color:var(--warn)}
+.clip .r{font-family:var(--pt-mono);color:var(--dim);font-size:11px}
+.clip button{padding:1px 6px;font-size:11px}
+.badge{display:inline-block;padding:0 5px;border-radius:4px;font-size:11px;font-weight:600;background:rgba(255,107,129,.18);color:var(--kill)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;flex-shrink:0}
+kbd{background:var(--pt-btn);border:1px solid var(--line);border-radius:3px;padding:0 4px;font-size:11px}
+progress{width:100%;height:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>BDO Kill Montage Maker <span style="color:var(--acc)">v2.2</span></h1>
+  <span style="color:var(--dim);font-size:12px">連続キル統合 + 可変シーン長/速度で全キルをビートに同期</span>
+</header>
+<main>
+  <section id="left">
+    <div id="videoWrap">
+      <div id="noVid">① 動画とチャプターJSON、② BGM を右のパネルから読み込むと<br>ここで音ハメプレビューできます</div>
+      <div id="beatDot" title="拍インジケータ (橙=小節頭)"></div>
+    </div>
+    <canvas id="mtl" title="クリックでシーク"></canvas>
+    <div id="transport">
+      <button class="primary" id="btnPlay" disabled>▶ プレビュー再生</button>
+      <button id="btnHead" disabled>⏮ 頭から</button>
+      <span id="tdisp">0:00 / 0:00</span>
+      <span style="flex:1"></span>
+      <label class="sl" style="width:190px" title="書き出しにも反映されます">BGM音量 <input type="range" id="vol" min="0" max="1" step="0.05" value="1"><span class="val" style="width:38px" id="volV">100%</span></label>
+      <label class="sl" style="width:210px" title="ゲーム音。書き出しにも反映されます">クリップ音量 <input type="range" id="cvol" min="0" max="1" step="0.05" value="0.3"><span class="val" style="width:38px" id="cvolV">30%</span></label>
+      <span style="color:var(--dim);font-size:12px"><kbd>Space</kbd>再生/停止</span>
+    </div>
+  </section>
+
+  <aside id="panel">
+    <div class="card">
+      <h2>1. 素材 (動画 + チャプターJSON)</h2>
+      <div class="row">
+        <button class="primary" id="btnAddVid">🎬 動画を追加</button>
+        <button id="btnAddJson">📄 チャプターJSONを追加</button>
+        <input type="file" id="vidInput" accept="video/*,.mkv" multiple style="display:none">
+        <input type="file" id="jsonInput" accept=".json,application/json" multiple style="display:none">
+      </div>
+      <div class="hint">BDO Chapter で「JSON保存」したファイルを、対応する元動画と一緒に読み込んでください (ファイル名で自動対応付け)。複数動画OK。</div>
+      <div id="vidList"></div>
+      <div class="status" id="matStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>2. BGM とビート解析</h2>
+      <div class="row">
+        <button class="primary" id="btnBgm">🎵 BGMを開く</button>
+        <input type="file" id="bgmInput" accept="audio/*" style="display:none">
+        <span id="bgmName" class="hint" style="margin:0"></span>
+      </div>
+      <canvas id="wave" title="クリックした位置を小節頭(強拍)に合わせます"></canvas>
+      <div class="row">
+        <label class="sl" style="flex:1;margin:0">表示 <input type="range" id="waveScroll" min="0" max="0" step="0.1" value="0"></label>
+        <select id="waveZoom"><option value="8">8秒</option><option value="16" selected>16秒</option><option value="40">40秒</option></select>
+      </div>
+      <label class="sl">BPM <input type="range" id="bpm" min="60" max="200" step="0.05" value="120"><span class="val" id="bpmV">120.00</span></label>
+      <label class="sl">拍オフセット <input type="range" id="off" min="0" max="2" step="0.005" value="0"><span class="val" id="offV">0.000</span></label>
+      <div class="row">
+        <button id="btnReDetect" disabled>再検出</button>
+        <button id="btnHalf" disabled>÷2</button>
+        <button id="btnDouble" disabled>×2</button>
+        <button id="btnShiftBeat" disabled title="小節頭の位置を1拍ずらす">+1拍ずらし</button>
+        <button id="btnClickPlay" disabled title="拍の位置でクリック音を鳴らして確認">🔔 拍クリック試聴</button>
+      </div>
+      <div class="hint">波形の山とビート線(黄=拍 / 橙=小節頭)が合うように調整。「拍クリック試聴」でメトロノーム音と曲がズレていなければOK。波形クリックでその位置を小節頭にできます。</div>
+      <div class="status" id="bgmStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>3. 音ハメ設定</h2>
+      <div class="row">
+        <span class="hint" style="margin:0">連続キル統合: 間隔</span>
+        <input type="number" id="mergeGap" value="6" min="0" max="30" step="1" style="width:52px">
+        <span class="hint" style="margin:0">秒以内のキルを1シーンにまとめる</span>
+      </div>
+      <div class="row">
+        <span class="hint" style="margin:0">シーン長:</span>
+        <select id="lenMode">
+          <option value="auto" selected>自動 (連続キルに合わせ伸縮)</option>
+          <option value="fixed">一定</option>
+        </select>
+        <select id="clipBeats" title="シーン長が「一定」のときの長さ">
+          <option value="4">4拍</option>
+          <option value="8" selected>8拍</option>
+          <option value="16">16拍</option>
+        </select>
+      </div>
+      <div class="row">
+        <span class="hint" style="margin:0">再生速度:</span>
+        <select id="spdMode">
+          <option value="auto" selected>自動 0.8〜1.3x (全キルを拍に合わせる)</option>
+          <option value="fixed">一定 1.0x</option>
+        </select>
+        <span class="hint" style="margin:0">キル後の余韻:</span>
+        <select id="tailBeats">
+          <option value="1">1拍</option>
+          <option value="2">2拍</option>
+          <option value="4" selected>4拍</option>
+        </select>
+      </div>
+      <div class="hint">カットは必ず拍、シーン最後のキルは<b>小節頭(最強拍)</b>に着地します。シーン長・速度とも「自動」にすると、連続キルの途中のキルも再生速度の微調整(0.8〜1.3x)で拍に着地し、最もリズミカルな音ハメになります。</div>
+      <div class="status" id="modeHint"></div>
+      <div class="row">
+        <span class="hint" style="margin:0">出力:</span>
+        <select id="res">
+          <option value="1920x1080x60" selected>1080p 60fps</option>
+          <option value="1920x1080x30">1080p 30fps</option>
+          <option value="1280x720x60">720p 60fps</option>
+        </select>
+        <input type="text" id="outName" value="kill_montage" style="width:180px" title="出力ファイル名 (既定は日時付き。書き出しのたびに現在時刻へ更新され重複しません)">
+        <span class="hint" style="margin:0">.mp4</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>4. シーン順序 <span id="clipCount" class="hint" style="display:inline"></span></h2>
+      <div class="row">
+        <button id="btnShuffle">🔀 シャッフル</button>
+        <button id="btnSortOrig">元の順に戻す</button>
+      </div>
+      <div id="clipList"></div>
+      <div class="hint">✔で採用/除外、↑↓で並べ替え。行クリックでその位置からプレビュー。「n連」=統合された連続キル、♪=拍に着地するキル数、×n.nn=再生速度。⚠は素材不足です。</div>
+    </div>
+
+    <div class="card">
+      <h2>5. 書き出し</h2>
+      <div class="row">
+        <button class="primary" id="btnBat" disabled>⬇ ffmpeg .bat 生成 (高画質)</button>
+        <button id="btnCopy" disabled>📋 コマンドをコピー</button>
+      </div>
+      <div class="row">
+        <button id="btnWebm" disabled>🎥 ブラウザで書き出し (webm)</button>
+        <button id="btnWebmCancel" disabled>中止</button>
+      </div>
+      <progress id="expProg" value="0" max="1" style="display:none"></progress>
+      <div class="hint">.bat: 元動画・BGMと同じフォルダに置いて実行。フレーム精度・高画質 (ffmpeg必須)。<br>ブラウザ書き出し: ffmpeg不要。実時間かけて再生しながら録画するため<b>タブを表示したまま</b>にしてください。BGM音量/クリップ音量はどちらにも反映されます (クリップ音量0%ならゲーム音なし)。</div>
+      <div class="status" id="expStatus"></div>
+    </div>
+  </aside>
+</main>
+
+<script>
+"use strict";
+/* ============================== state ============================== */
+const $ = id => document.getElementById(id);
+const M = {
+  videos: [],        // {name,size,file,url,el,duration,kills:[],ready}
+  pendingJson: [],
+  bgm: null,         // {name,file,url,buffer,duration,flux,fps}
+  beat: {bpm:120, offset:0},
+  scenes: [],        // [{vi,kills:[t...],on}] 表示順=配列順
+  segs: [], total: 0,
+  playing: false, clickOn: false, exporting: null, wasCancelled: false,
+  actx: null,
+};
+const PAL = ["#a78bfa","#7de0ae","#ff9d3c","#c78bff","#5ad8d8","#ff8ab3","#d0d465","#8ea5ff"];
+const fmt = s => { s=Math.max(0,s); const m=Math.floor(s/60),x=Math.floor(s%60);
+  return m+":"+String(x).padStart(2,"0"); };
+const fmtMs = s => fmt(s)+"."+String(Math.floor(Math.max(0,s)%1*10));
+function setStatus(el,msg,cls){ el.textContent=msg; el.className="status"+(cls?" "+cls:""); }
+function actx(){ if(!M.actx) M.actx=new (window.AudioContext||window.webkitAudioContext)(); return M.actx; }
+const baseName = n => n.replace(/\.[^.]+$/,"");
+const fracDist = x => Math.abs(x-Math.round(x));
+
+/* ============================== audio graph (プレビュー/書き出し共用) ============================== */
+let AG=null;
+function ensureGraph(){
+  if(AG) return AG;
+  const ctx=actx();
+  const master=ctx.createGain(), spk=ctx.createGain(), dest=ctx.createMediaStreamDestination();
+  master.connect(spk); spk.connect(ctx.destination); master.connect(dest);
+  AG={ctx,master,spk,dest,hooked:new Set()};
+  hookAudio(bgmAudio);
+  for(const v of M.videos) hookAudio(v.el);
+  return AG;
+}
+function hookAudio(el){
+  if(!AG||AG.hooked.has(el)) return;
+  try{ AG.ctx.createMediaElementSource(el).connect(AG.master); AG.hooked.add(el); }catch(e){}
+}
+
+/* ============================== 1. materials ============================== */
+$("btnAddVid").onclick = ()=>$("vidInput").click();
+$("btnAddJson").onclick = ()=>$("jsonInput").click();
+$("vidInput").onchange = e=>{ for(const f of e.target.files) addVideo(f); e.target.value=""; };
+$("jsonInput").onchange = e=>{ for(const f of e.target.files) addJson(f); e.target.value=""; };
+document.addEventListener("dragover",e=>e.preventDefault());
+document.addEventListener("drop",e=>{
+  e.preventDefault();
+  for(const f of e.dataTransfer.files){
+    if(f.name.endsWith(".json")) addJson(f);
+    else if(f.type.startsWith("audio/")||/\.(mp3|m4a|aac|ogg|wav|flac)$/i.test(f.name)) loadBgm(f);
+    else addVideo(f);
+  }
+});
+
+function addVideo(f){
+  if(M.videos.some(v=>v.name===f.name&&v.size===f.size)) return;
+  const el=document.createElement("video");
+  el.volume=+$("cvol").value; el.muted=el.volume===0;
+  el.playsInline=true; el.preload="auto";
+  el.src=URL.createObjectURL(f);
+  $("videoWrap").insertBefore(el,$("beatDot"));
+  const v={name:f.name,size:f.size,file:f,el,duration:0,kills:[],ready:false};
+  el.onloadedmetadata=()=>{ v.duration=el.duration; v.ready=true; renderMats(); rebuildScenes(); };
+  M.videos.push(v);
+  hookAudio(el);
+  const pi=M.pendingJson.findIndex(p=>p.file===f.name||baseName(p.file)===baseName(f.name));
+  if(pi>=0){ v.kills=M.pendingJson[pi].kills; M.pendingJson.splice(pi,1); }
+  renderMats(); rebuildScenes();
+}
+async function addJson(f){
+  let o;
+  try{ o=JSON.parse(await f.text()); }
+  catch(e){ setStatus($("matStatus"),f.name+": JSONを解析できません。","warn"); return; }
+  const kills=(o.chapters||[]).filter(c=>c.type==="kill").map(c=>+c.time).sort((a,b)=>a-b);
+  if(!kills.length){ setStatus($("matStatus"),f.name+": キルチャプターがありません。","warn"); return; }
+  const target=o.file||baseName(f.name).replace(/\.chapters$/,"");
+  const v=M.videos.find(v=>v.name===target||baseName(v.name)===baseName(target));
+  if(v){ v.kills=kills; setStatus($("matStatus"),v.name+" にキル"+kills.length+"件を対応付けました。","ok"); }
+  else{
+    M.pendingJson.push({file:target,kills});
+    setStatus($("matStatus"),"動画「"+target+"」待ち (JSONは読み込み済)。","warn");
+  }
+  renderMats(); rebuildScenes();
+}
+function renderMats(){
+  const box=$("vidList"); box.innerHTML="";
+  M.videos.forEach((v,i)=>{
+    const d=document.createElement("div"); d.className="mat";
+    d.innerHTML=`<span class="sw" style="background:${PAL[i%PAL.length]}"></span>
+      <span class="nm" title="${v.name}">${v.name}</span>
+      <span class="hint" style="margin:0">${v.ready?fmt(v.duration):"読み込み中"}</span>
+      <span class="k">${v.kills.length?("キル"+v.kills.length):"JSON未"}</span>`;
+    box.appendChild(d);
+  });
+  for(const p of M.pendingJson){
+    const d=document.createElement("div"); d.className="mat";
+    d.innerHTML=`<span class="sw" style="background:#444"></span><span class="nm">${p.file} (動画未読み込み)</span><span class="k">キル${p.kills.length}</span>`;
+    box.appendChild(d);
+  }
+}
+/* ---- 連続キルをシーンに統合 ---- */
+function rebuildScenes(){
+  const gap=+$("mergeGap").value||0;
+  const fresh=[];
+  M.videos.forEach((v,vi)=>{
+    let cur=null;
+    for(const t of v.kills){
+      if(cur&&t-cur.kills[cur.kills.length-1]<=gap) cur.kills.push(t);
+      else{ cur={vi,kills:[t],on:true}; fresh.push(cur); }
+    }
+  });
+  // 既存の採用状態・並び順をできるだけ維持 (先頭キル時刻で対応付け)
+  const out=[];
+  for(const old of M.scenes){
+    const m=fresh.find(f=>!out.includes(f)&&f.vi===old.vi&&f.kills.includes(old.kills[0]));
+    if(m){ m.on=old.on&&m.on; out.push(m); }
+  }
+  for(const f of fresh) if(!out.includes(f)) out.push(f);
+  M.scenes=out;
+  refresh();
+}
+$("mergeGap").onchange=()=>{ rebuildScenes(); saveSoon(); };
+
+/* ============================== 2. BGM / beat detection ============================== */
+$("btnBgm").onclick=()=>$("bgmInput").click();
+$("bgmInput").onchange=e=>{ if(e.target.files[0]) loadBgm(e.target.files[0]); e.target.value=""; };
+const bgmAudio=new Audio();
+function applyVols(){
+  bgmAudio.volume=+$("vol").value;
+  $("volV").textContent=Math.round($("vol").value*100)+"%";
+  const cv=+$("cvol").value;
+  for(const v of M.videos){ v.el.volume=cv; v.el.muted=cv===0; }
+  $("cvolV").textContent=Math.round(cv*100)+"%";
+}
+$("vol").oninput=()=>{ applyVols(); saveSoon(); };
+$("cvol").oninput=()=>{ applyVols(); saveSoon(); };
+
+async function loadBgm(f){
+  setStatus($("bgmStatus"),"デコード・ビート解析中…");
+  try{
+    const buf=await actx().decodeAudioData(await f.arrayBuffer());
+    if(M.bgm) URL.revokeObjectURL(M.bgm.url);
+    const url=URL.createObjectURL(f);
+    bgmAudio.src=url;
+    const {flux,fps}=computeFlux(buf);
+    M.bgm={name:f.name,file:f,url,buffer:buf,duration:buf.duration,flux,fps};
+    $("bgmName").textContent=f.name+" ("+fmt(buf.duration)+")";
+    for(const id of ["btnReDetect","btnHalf","btnDouble","btnShiftBeat","btnClickPlay"]) $(id).disabled=false;
+    $("waveScroll").max=Math.max(0,buf.duration-+$("waveZoom").value);
+    const saved=store().bgms[f.name+":"+f.size];
+    if(saved){ setBeat(saved.bpm,saved.offset); setStatus($("bgmStatus"),"前回の BPM/オフセット を復元しました。","ok"); }
+    else detect();
+  }catch(e){ setStatus($("bgmStatus"),"読み込み失敗: "+(e.message||e),"warn"); }
+}
+function computeFlux(buffer){
+  const sr=buffer.sampleRate, hop=256, win=1024;
+  const L=buffer.length, ch=buffer.numberOfChannels;
+  const x=new Float32Array(L);
+  for(let c=0;c<ch;c++){ const d=buffer.getChannelData(c); for(let i=0;i<L;i++) x[i]+=d[i]/ch; }
+  const n=Math.max(1,Math.floor((L-win)/hop));
+  const env=new Float32Array(n);
+  for(let i=0;i<n;i++){ let s=0; const o=i*hop; for(let j=0;j<win;j+=2){ const v=x[o+j]; s+=v*v; } env[i]=Math.sqrt(s/(win/2)); }
+  const flux=new Float32Array(n);
+  let mx=1e-9;
+  for(let i=1;i<n;i++){ flux[i]=Math.max(0,env[i]-env[i-1]); if(flux[i]>mx) mx=flux[i]; }
+  for(let i=0;i<n;i++) flux[i]/=mx;
+  return {flux,fps:sr/hop};
+}
+function detect(){
+  const {flux,fps}=M.bgm;
+  const minL=Math.round(fps*60/200), maxL=Math.round(fps*60/60);
+  const N=Math.min(flux.length,Math.round(fps*90));
+  const ac=new Float32Array(maxL+1);
+  for(let l=minL;l<=maxL;l++){ let s=0; for(let i=0;i<N-l;i++) s+=flux[i]*flux[i+l]; ac[l]=s/(N-l); }
+  let best=-1,bl=minL;
+  for(let l=minL;l<=maxL;l++){
+    const bpm=60*fps/l;
+    const w=Math.exp(-Math.pow((bpm-125)/70,2)*0.5);
+    if(ac[l]*w>best){ best=ac[l]*w; bl=l; }
+  }
+  let l=bl;
+  if(bl>minL&&bl<maxL){
+    const a=ac[bl-1],b=ac[bl],c=ac[bl+1];
+    const d=(a-c)/(2*(a-2*b+c)||1e-9);
+    if(Math.abs(d)<1) l=bl+d;
+  }
+  const bpm=Math.round(60*fps/l*20)/20;
+  const offset=detectPhase(flux,fps,bpm);
+  setBeat(bpm,offset);
+  setStatus($("bgmStatus"),"検出: "+bpm.toFixed(2)+" BPM。「拍クリック試聴」でズレを確認し、合わなければ ÷2/×2 やスライダーで補正してください。","ok");
+}
+function detectPhase(flux,fps,bpm){
+  const P=fps*60/bpm;
+  const K=Math.max(1,Math.floor((flux.length-1)/P));
+  const steps=Math.max(1,Math.round(P));
+  let best=-1,bp=0;
+  for(let s=0;s<steps;s++){
+    let sum=0,c=0;
+    for(let k=0;k<K;k++){ const i=Math.round(s+k*P); if(i<flux.length){ sum+=flux[i]; c++; } }
+    if(c&&sum/c>best){ best=sum/c; bp=s; }
+  }
+  let bq=0,bs=-1;
+  for(let q=0;q<4;q++){
+    let sum=0,c=0;
+    for(let k=q;k<K;k+=4){ const i=Math.round(bp+k*P); if(i<flux.length){ sum+=flux[i]; c++; } }
+    if(c&&sum/c>bs){ bs=sum/c; bq=q; }
+  }
+  const bar=4*60/bpm;
+  return ((bp+bq*P)/fps)%bar;
+}
+function setBeat(bpm,offset){
+  const bar=4*60/bpm;
+  M.beat.bpm=bpm; M.beat.offset=((offset%bar)+bar)%bar;
+  $("bpm").value=bpm; $("off").max=bar.toFixed(3); $("off").value=M.beat.offset;
+  $("bpmV").textContent=bpm.toFixed(2); $("offV").textContent=M.beat.offset.toFixed(3);
+  refresh(); saveSoon();
+}
+$("bpm").oninput=()=>setBeat(+$("bpm").value,M.beat.offset);
+$("off").oninput=()=>{ M.beat.offset=+$("off").value; $("offV").textContent=M.beat.offset.toFixed(3); refresh(); saveSoon(); };
+$("btnReDetect").onclick=()=>detect();
+$("btnHalf").onclick=()=>setBeat(Math.max(60,M.beat.bpm/2),M.beat.offset);
+$("btnDouble").onclick=()=>setBeat(Math.min(200,M.beat.bpm*2),M.beat.offset);
+$("btnShiftBeat").onclick=()=>setBeat(M.beat.bpm,M.beat.offset+60/M.beat.bpm);
+
+/* ---- waveform ---- */
+const wave=$("wave"), wctx=wave.getContext("2d");
+$("waveZoom").onchange=()=>{ if(M.bgm) $("waveScroll").max=Math.max(0,M.bgm.duration-+$("waveZoom").value); drawWave(); };
+$("waveScroll").oninput=drawWave;
+wave.onclick=e=>{
+  if(!M.bgm) return;
+  const r=wave.getBoundingClientRect();
+  const t=+$("waveScroll").value+(e.clientX-r.left)/r.width*+$("waveZoom").value;
+  setBeat(M.beat.bpm,t);
+  setStatus($("bgmStatus"),fmtMs(t)+" を小節頭に設定しました。","ok");
+};
+function drawWave(){
+  const w=wave.clientWidth,h=80;
+  if(wave.width!==Math.round(w*devicePixelRatio)){ wave.width=Math.round(w*devicePixelRatio); wave.height=Math.round(h*devicePixelRatio); }
+  wctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  wctx.clearRect(0,0,w,h);
+  if(!M.bgm) return;
+  const t0=+$("waveScroll").value, win=+$("waveZoom").value;
+  const {flux,fps}=M.bgm;
+  wctx.fillStyle="rgba(167,139,250,.55)";
+  for(let px=0;px<w;px++){
+    const a=Math.floor((t0+px/w*win)*fps), b=Math.floor((t0+(px+1)/w*win)*fps);
+    let mx=0;
+    for(let i=a;i<=b&&i<flux.length;i++) if(flux[i]>mx) mx=flux[i];
+    const bh=Math.pow(mx,0.6)*(h-8);
+    wctx.fillRect(px,h-4-bh,1,bh);
+  }
+  const beat=60/M.beat.bpm;
+  const k0=Math.ceil((t0-M.beat.offset)/beat);
+  for(let k=k0;;k++){
+    const t=M.beat.offset+k*beat;
+    if(t>t0+win) break;
+    if(t<0) continue;
+    const x=(t-t0)/win*w;
+    const down=((k%4)+4)%4===0;
+    wctx.fillStyle=down?"rgba(255,157,60,.9)":"rgba(255,210,87,.45)";
+    wctx.fillRect(x-(down?1:0.5),0,down?2:1,h);
+  }
+  if(M.playing||M.clickOn){
+    const x=(bgmAudio.currentTime-t0)/win*w;
+    if(x>=0&&x<=w){ wctx.fillStyle="#e9e6f5"; wctx.fillRect(x-0.75,0,1.5,h); }
+  }
+}
+
+/* ---- 拍クリック試聴 ---- */
+let clickLastBeat=-1;
+$("btnClickPlay").onclick=async()=>{
+  if(!M.bgm) return;
+  if(M.clickOn){ stopClick(); return; }
+  if(M.playing) stopPreview();
+  await actx().resume();
+  M.clickOn=true; clickLastBeat=-1;
+  $("btnClickPlay").classList.add("on");
+  bgmAudio.currentTime=Math.max(0,+$("waveScroll").value);
+  bgmAudio.play();
+  clickLoop();
+};
+function stopClick(){ M.clickOn=false; $("btnClickPlay").classList.remove("on"); bgmAudio.pause(); }
+function clickLoop(){
+  if(!M.clickOn) return;
+  const ctx=actx(), beat=60/M.beat.bpm;
+  const t=bgmAudio.currentTime, horizon=t+0.25;
+  let k=Math.max(clickLastBeat+1,Math.ceil((t-M.beat.offset)/beat));
+  for(;M.beat.offset+k*beat<horizon;k++){
+    const bt=M.beat.offset+k*beat;
+    if(bt<t-0.02) continue;
+    const at=ctx.currentTime+(bt-t);
+    const down=((k%4)+4)%4===0;
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.frequency.value=down?1568:1047;
+    g.gain.setValueAtTime(down?0.5:0.3,at);
+    g.gain.exponentialRampToValueAtTime(0.001,at+0.06);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(at); o.stop(at+0.07);
+    clickLastBeat=k;
+  }
+  const win=+$("waveZoom").value;
+  if(bgmAudio.currentTime>+$("waveScroll").value+win) $("waveScroll").value=bgmAudio.currentTime;
+  drawWave();
+  if(bgmAudio.ended){ stopClick(); return; }
+  requestAnimationFrame(clickLoop);
+}
+
+/* ============================== 3. timeline computation ============================== */
+/* 出力名: 既定は kill_montage_yyyymmddhhmm (書き出し時に現在時刻へ更新して重複回避) */
+function autoName(){
+  const d=new Date(), p=n=>String(n).padStart(2,"0");
+  return "kill_montage_"+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+p(d.getHours())+p(d.getMinutes());
+}
+const isAutoName=n=>/^kill_montage(_\d{12})?$/.test(n);
+function freshenName(){
+  const n=$("outName").value.trim();
+  if(!n||isAutoName(n)) $("outName").value=autoName();
+}
+function settings(){
+  const [W,H,F]=$("res").value.split("x").map(Number);
+  return {clipBeats:+$("clipBeats").value, tailBeats:+$("tailBeats").value,
+    lenMode:$("lenMode").value, spdMode:$("spdMode").value,
+    W,H,F, out:($("outName").value.trim()||autoName())};
+}
+for(const id of ["clipBeats","tailBeats","res","lenMode","spdMode"]) $(id).onchange=()=>{ refresh(); saveSoon(); };
+$("outName").onchange=()=>saveSoon();
+
+/* 速度の最適化: シーン内の中間キルが拍に最も乗る r を 0.8〜1.3 から選ぶ */
+function bestRate(kills,beat,maxSpanBeats){
+  if(kills.length<2) return 1;
+  const kn=kills[kills.length-1], span=kn-kills[0];
+  let best=null,bc=1e9;
+  for(let r=0.8;r<=1.3001;r+=0.005){
+    if(maxSpanBeats!=null && span/(r*beat)>maxSpanBeats) continue;
+    let c=0;
+    for(let i=0;i<kills.length-1;i++) c+=fracDist((kn-kills[i])/(r*beat));
+    c=c/(kills.length-1)+0.15*Math.abs(r-1);
+    if(c<bc){ bc=c; best=r; }
+  }
+  return best==null?null:Math.round(best*1000)/1000;
+}
+
+function computeSegments(){
+  const s=settings(), b=M.beat, beat=60/b.bpm, tail=s.tailBeats, grid=b.offset;
+  const list=M.scenes.filter(c=>c.on&&M.videos[c.vi]&&M.videos[c.vi].ready);
+  const segs=[]; let bIdx=0;
+  for(let i=0;i<list.length;i++){
+    const sc=list[i], v=M.videos[sc.vi];
+    const ks=sc.kills, kn=ks[ks.length-1], span=kn-ks[0];
+    let r=1, killLocal, sceneBeats;
+    const warn=[];
+    if(s.lenMode==="fixed"){
+      killLocal=Math.max(1,s.clipBeats-tail); sceneBeats=s.clipBeats;
+      if(s.spdMode==="auto"){
+        const br=bestRate(ks,beat,killLocal-1);
+        if(br==null){ r=1.3; warn.push("連続キルが収まりません(シーン長を自動に)"); }
+        else r=br;
+      }else if(span/beat>killLocal-0.5) warn.push("連続キルが収まりません(自動速度/自動シーン長を推奨)");
+    }else{
+      if(s.spdMode==="auto") r=bestRate(ks,beat,null)||1;
+      const need=1+span/(r*beat);                       // 先頭キル前に最低1拍のリード
+      const g=Math.max(4,Math.ceil((bIdx+need)/4)*4);   // 最後のキル=小節頭(4拍単位)
+      killLocal=g-bIdx; sceneBeats=killLocal+tail;
+      if(sceneBeats>64) warn.push("シーンが長すぎます(統合間隔を短くしてください)");
+    }
+    const start=i===0?0:grid+bIdx*beat;
+    const end=grid+(bIdx+sceneBeats)*beat;
+    const killMT=grid+(bIdx+killLocal)*beat;
+    const srcStart=kn-(killMT-start)*r;
+    if(srcStart<-0.05) warn.push("前"+(-srcStart).toFixed(1)+"s不足");
+    if(srcStart+(end-start)*r>v.duration+0.05) warn.push("後不足");
+    let onBeat=1;
+    for(let j=0;j<ks.length-1;j++) if(fracDist((kn-ks[j])/(r*beat))<0.15) onBeat++;
+    segs.push({scene:sc,vi:sc.vi,start,end,dur:end-start,srcStart:Math.max(0,srcStart),
+      killMT,r,kills:ks,nk:ks.length,onBeat,warn});
+    bIdx+=sceneBeats;
+  }
+  M.segs=segs;
+  M.total=segs.length?segs[segs.length-1].end:0;
+}
+function refresh(){ computeSegments(); renderScenes(); drawMtl(); drawWave(); updateButtons(); updateModeHint(); }
+function updateButtons(){
+  const ok=M.segs.length>0&&M.bgm;
+  const busy=!!M.exporting;
+  $("btnPlay").disabled=!ok||busy; $("btnHead").disabled=!ok||busy;
+  $("btnBat").disabled=!ok||busy; $("btnCopy").disabled=!ok||busy;
+  $("btnWebm").disabled=!ok||busy; $("btnWebmCancel").disabled=!busy;
+  $("tdisp").textContent=fmt(M.playing?bgmAudio.currentTime:0)+" / "+fmt(M.total);
+  if(ok&&M.bgm.duration<M.total)
+    setStatus($("expStatus"),"⚠ BGM("+fmt(M.bgm.duration)+")がモンタージュ("+fmt(M.total)+")より短いため、末尾は無音になります。シーンを減らすか長い曲にしてください。","warn");
+}
+function updateModeHint(){
+  const s=settings();
+  const multi=M.segs.filter(x=>x.nk>1);
+  if(!multi.length){ setStatus($("modeHint"),""); return; }
+  if(s.lenMode!=="auto"||s.spdMode!=="auto"){
+    setStatus($("modeHint"),"💡 連続キルシーンが"+multi.length+"件あります。シーン長と再生速度を両方「自動」にすると、途中のキルも拍に着地する高精度な音ハメになります。","warn");
+  }else{
+    let tot=0,on=0;
+    for(const x of multi){ tot+=x.nk; on+=x.onBeat; }
+    setStatus($("modeHint"),"♪ 自動調整: 連続キル"+multi.length+"シーン、全"+tot+"キル中"+on+"キルが拍に着地 (速度0.8〜1.3x)","ok");
+  }
+}
+
+/* ============================== 4. scene list ============================== */
+function renderScenes(){
+  const box=$("clipList"); box.innerHTML="";
+  $("clipCount").textContent=" (採用"+M.scenes.filter(c=>c.on).length+" / 全"+M.scenes.length+" ・ 完成尺 "+fmt(M.total)+")";
+  M.scenes.forEach((c,i)=>{
+    const v=M.videos[c.vi];
+    const seg=M.segs.find(s=>s.scene===c);
+    const d=document.createElement("div");
+    d.className="clip"+(c.on?"":" off");
+    const nk=c.kills.length;
+    d.innerHTML=`<input type="checkbox" ${c.on?"checked":""}>
+      <span class="sw" style="background:${PAL[c.vi%PAL.length]}"></span>
+      <span class="t">${fmtMs(c.kills[0])}</span>
+      ${nk>1?`<span class="badge">${nk}連</span>`:""}
+      <span class="nm">${v?v.name:"?"}</span>
+      ${seg&&nk>1?`<span class="r" title="拍に着地するキル数">♪${seg.onBeat}/${nk}</span>`:""}
+      ${seg&&Math.abs(seg.r-1)>0.001?`<span class="r">×${seg.r.toFixed(2)}</span>`:""}
+      ${seg&&seg.warn.length?`<span class="w" title="${seg.warn.join(" / ")}">⚠</span>`:""}
+      <button data-a="up" title="上へ">↑</button><button data-a="dn" title="下へ">↓</button>`;
+    d.querySelector("input").onclick=e=>{ e.stopPropagation(); c.on=e.target.checked; refresh(); };
+    d.querySelectorAll("button").forEach(b=>b.onclick=e=>{
+      e.stopPropagation();
+      const j=b.dataset.a==="up"?i-1:i+1;
+      if(j<0||j>=M.scenes.length) return;
+      [M.scenes[i],M.scenes[j]]=[M.scenes[j],M.scenes[i]];
+      refresh();
+    });
+    d.onclick=()=>{ if(seg&&M.bgm&&!M.exporting){ startPreview(Math.max(0,seg.start)); } };
+    box.appendChild(d);
+  });
+}
+$("btnShuffle").onclick=()=>{
+  for(let i=M.scenes.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [M.scenes[i],M.scenes[j]]=[M.scenes[j],M.scenes[i]]; }
+  refresh();
+};
+$("btnSortOrig").onclick=()=>{ M.scenes.sort((a,b)=>a.vi-b.vi||a.kills[0]-b.kills[0]); refresh(); };
+
+/* ---- montage timeline canvas ---- */
+const mtl=$("mtl"), mctx=mtl.getContext("2d");
+function drawMtl(){
+  const w=mtl.clientWidth,h=64;
+  if(mtl.width!==Math.round(w*devicePixelRatio)){ mtl.width=Math.round(w*devicePixelRatio); mtl.height=Math.round(h*devicePixelRatio); }
+  mctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  mctx.clearRect(0,0,w,h);
+  if(!M.total) return;
+  const X=t=>t/M.total*w;
+  for(const s of M.segs){
+    mctx.fillStyle=PAL[s.vi%PAL.length]+"55";
+    mctx.fillRect(X(s.start),12,X(s.end)-X(s.start)-1,h-24);
+    const kn=s.kills[s.kills.length-1];
+    for(const k of s.kills){
+      const mt=s.killMT-(kn-k)/s.r;
+      const last=k===kn;
+      mctx.fillStyle=last?"#ff6b81":"rgba(255,107,129,.55)";
+      mctx.beginPath(); mctx.moveTo(X(mt),12); mctx.lineTo(X(mt)-(last?4:3),4); mctx.lineTo(X(mt)+(last?4:3),4); mctx.fill();
+      mctx.fillRect(X(mt)-0.5,12,1,h-24);
+    }
+    if(s.warn.length){ mctx.fillStyle="#e8b45a"; mctx.fillRect(X(s.start),h-10,X(s.end)-X(s.start)-1,3); }
+  }
+  const beat=60/M.beat.bpm;
+  for(let k=0;M.beat.offset+k*beat<=M.total;k++){
+    const t=M.beat.offset+k*beat, down=k%4===0;
+    mctx.fillStyle=down?"rgba(255,157,60,.6)":"rgba(255,210,87,.22)";
+    mctx.fillRect(X(t)-0.5,h-14,down?1.5:1,12);
+  }
+  if(M.playing){ mctx.fillStyle="#e9e6f5"; mctx.fillRect(X(bgmAudio.currentTime)-0.75,0,1.5,h); }
+}
+mtl.onclick=e=>{
+  if(!M.total||!M.bgm||M.exporting) return;
+  const r=mtl.getBoundingClientRect();
+  startPreview((e.clientX-r.left)/r.width*M.total);
+};
+
+/* ============================== preview ============================== */
+let curSeg=null;
+$("btnPlay").onclick=()=>{ M.playing?stopPreview():startPreview(bgmAudio.currentTime<M.total?bgmAudio.currentTime:0); };
+$("btnHead").onclick=()=>startPreview(0);
+document.addEventListener("keydown",e=>{
+  if(e.code==="Space"&&e.target.tagName!=="INPUT"&&e.target.tagName!=="SELECT"){
+    e.preventDefault();
+    if(!$("btnPlay").disabled) $("btnPlay").click();
+  }
+});
+async function startPreview(at){
+  if(M.clickOn) stopClick();
+  if(!M.segs.length||!M.bgm) return;
+  await actx().resume();
+  M.playing=true; curSeg=null;
+  for(const v of M.videos) v.el.pause();
+  $("btnPlay").textContent="⏸ 停止";
+  $("noVid").style.display="none";
+  bgmAudio.currentTime=Math.min(at,Math.max(0,M.total-0.05));
+  bgmAudio.play();
+  previewLoop();
+}
+function stopPreview(){
+  M.playing=false;
+  $("btnPlay").textContent="▶ プレビュー再生";
+  bgmAudio.pause();
+  for(const v of M.videos){ v.el.pause(); v.el.playbackRate=1; }
+  if(M.exporting) finishExport();
+  drawMtl(); updateButtons();
+}
+function previewLoop(){
+  if(!M.playing) return;
+  const t=bgmAudio.currentTime;
+  if(t>=M.total||bgmAudio.ended){ stopPreview(); return; }
+  const seg=M.segs.find(s=>t>=s.start&&t<s.end);
+  if(seg&&seg!==curSeg){
+    curSeg=seg;
+    const v=M.videos[seg.vi];
+    for(const o of M.videos) if(o!==v){ o.el.style.display="none"; o.el.pause(); }
+    v.el.style.display="block";
+    v.el.playbackRate=seg.r;
+    v.el.currentTime=seg.srcStart+(t-seg.start)*seg.r;
+    v.el.play();
+    const ni=M.segs.indexOf(seg)+1;
+    if(ni<M.segs.length&&M.segs[ni].vi!==seg.vi){
+      const nv=M.videos[M.segs[ni].vi];
+      nv.el.currentTime=M.segs[ni].srcStart;
+    }
+  }else if(seg){
+    const exp=seg.srcStart+(t-seg.start)*seg.r, v=M.videos[seg.vi];
+    if(Math.abs(v.el.currentTime-exp)>0.12) v.el.currentTime=exp;
+    if(v.el.paused) v.el.play();
+  }
+  // 書き出し中: canvasへ描画 + フェード + 進捗
+  if(M.exporting){
+    const ex=M.exporting;
+    drawFrame(ex.cctx,curSeg?M.videos[curSeg.vi].el:null,ex.cv.width,ex.cv.height);
+    if(AG) AG.master.gain.value=t>M.total-2?Math.max(0,(M.total-t)/2):1;
+    $("expProg").value=t/M.total;
+  }
+  const beat=60/M.beat.bpm;
+  const ph=(t-M.beat.offset)/beat;
+  const k=Math.floor(ph+0.5), near=Math.abs(ph-k)*beat<0.06;
+  $("beatDot").className=near?(((k%4)+4)%4===0?"d":"b"):"";
+  $("tdisp").textContent=fmt(t)+" / "+fmt(M.total);
+  drawMtl();
+  requestAnimationFrame(previewLoop);
+}
+
+/* ============================== 5a. ffmpeg export ============================== */
+function q(s){ return '"'+s+'"'; }
+function buildCmds(){
+  const s=settings();
+  const bv=(+$("vol").value).toFixed(2), cv=(+$("cvol").value).toFixed(2);
+  const useGameAudio=+cv>0;
+  const enc=[]; const listLines=[];
+  M.segs.forEach((sg,i)=>{
+    const n="_mt_c"+String(i+1).padStart(3,"0")+".mp4";
+    const spd=Math.abs(sg.r-1)>0.001;
+    const vf="scale="+s.W+":"+s.H+":force_original_aspect_ratio=decrease,pad="+s.W+":"+s.H+":(ow-iw)/2:(oh-ih)/2"
+      +(spd?",setpts=PTS/"+sg.r.toFixed(3):"")+",fps="+s.F;
+    const aud=useGameAudio
+      ? ' -af "aresample=48000:async=1'+(spd?",atempo="+sg.r.toFixed(3):"")+',volume='+cv+'" -c:a aac -b:a 192k -ac 2'
+      : " -an";
+    enc.push("ffmpeg -y -ss "+sg.srcStart.toFixed(3)+" -i "+q(M.videos[sg.vi].name)+" -t "+sg.dur.toFixed(3)
+      +' -vf "'+vf+'"'+aud+" -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p "+q(n));
+    listLines.push("file '"+n+"'");
+  });
+  const total=M.total.toFixed(3);
+  const fadeSt=Math.max(0,M.total-2).toFixed(3);
+  const mux=useGameAudio
+    ? "ffmpeg -y -i _mt_video.mp4 -i "+q(M.bgm.name)
+      +' -filter_complex "[1:a]volume='+bv+'[b];[0:a][b]amix=inputs=2:duration=first:normalize=0,afade=t=out:st='+fadeSt+':d=2[a]"'
+      +' -map 0:v -map "[a]" -t '+total+" -c:v copy -c:a aac -b:a 192k "+q(s.out+".mp4")
+    : "ffmpeg -y -i _mt_video.mp4 -i "+q(M.bgm.name)
+      +" -map 0:v -map 1:a -t "+total+' -af "volume='+bv+',afade=t=out:st='+fadeSt+':d=2" -c:v copy -c:a aac -b:a 192k '+q(s.out+".mp4");
+  return {enc,listLines,mux,out:s.out+".mp4"};
+}
+$("btnBat").onclick=()=>{
+  freshenName();
+  const c=buildCmds();
+  const L=[];
+  L.push("@echo off","chcp 65001 >nul",'cd /d "%~dp0"');
+  L.push("where ffmpeg >nul 2>nul || (echo ffmpeg が見つかりません。インストールして PATH を通してください。 & pause & exit /b 1)");
+  L.push("echo ["+c.enc.length+"シーン] 切り出し中...");
+  c.enc.forEach(x=>L.push(x+" || goto :err"));
+  L.push("> _mt_list.txt echo "+c.listLines[0]);
+  c.listLines.slice(1).forEach(x=>L.push(">> _mt_list.txt echo "+x));
+  L.push("echo 連結中...");
+  L.push("ffmpeg -y -f concat -safe 0 -i _mt_list.txt -c copy _mt_video.mp4 || goto :err");
+  L.push("echo BGM合成中...");
+  L.push(c.mux+" || goto :err");
+  L.push("del _mt_c*.mp4 _mt_list.txt _mt_video.mp4 >nul 2>nul");
+  L.push("echo.","echo 完成: "+c.out,"pause","exit /b 0");
+  L.push(":err","echo エラーが発生しました。","pause","exit /b 1");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob(["﻿"+L.join("\r\n")+"\r\n"],{type:"text/plain"}));
+  a.download=settings().out+"_render.bat"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+  setStatus($("expStatus"),".bat を生成しました。元動画・BGMと同じフォルダに置いて実行してください。","ok");
+};
+$("btnCopy").onclick=async()=>{
+  freshenName();
+  const c=buildCmds();
+  const txt=c.enc.join("\n")+"\n"+"# concat list (_mt_list.txt):\n"+c.listLines.join("\n")
+    +"\nffmpeg -y -f concat -safe 0 -i _mt_list.txt -c copy _mt_video.mp4\n"+c.mux+"\n";
+  await navigator.clipboard.writeText(txt);
+  setStatus($("expStatus"),"コマンドをコピーしました。","ok");
+};
+
+/* ============================== 5b. browser export (webm) ============================== */
+function drawFrame(cctx,el,W,H){
+  cctx.fillStyle="#000"; cctx.fillRect(0,0,W,H);
+  if(!el||!el.videoWidth) return;
+  const va=el.videoWidth/el.videoHeight, ca=W/H;
+  let dw,dh;
+  if(va>ca){ dw=W; dh=W/va; } else { dh=H; dw=H*va; }
+  cctx.drawImage(el,(W-dw)/2,(H-dh)/2,dw,dh);
+}
+$("btnWebm").onclick=async()=>{
+  if(!M.segs.length||!M.bgm||M.exporting) return;
+  if(M.playing) stopPreview();
+  if(M.clickOn) stopClick();
+  if(!confirm("再生しながら録画するため約 "+fmt(M.total)+" かかります。\n書き出し中はこのタブを表示したままにしてください。よろしいですか？")) return;
+  freshenName();
+  const s=settings();
+  const g=ensureGraph();
+  await actx().resume();
+  const cv=document.createElement("canvas"); cv.width=s.W; cv.height=s.H;
+  const cctx=cv.getContext("2d");
+  let mime="video/webm;codecs=vp9,opus";
+  if(!MediaRecorder.isTypeSupported(mime)) mime="video/webm;codecs=vp8,opus";
+  if(!MediaRecorder.isTypeSupported(mime)) mime="video/webm";
+  const stream=new MediaStream([...cv.captureStream(s.F).getVideoTracks(),...g.dest.stream.getAudioTracks()]);
+  let rec;
+  try{ rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:12e6,audioBitsPerSecond:192e3}); }
+  catch(e){ setStatus($("expStatus"),"MediaRecorder初期化エラー: "+(e.message||e),"warn"); return; }
+  const chunks=[];
+  rec.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+  rec.onstop=()=>{
+    const blob=new Blob(chunks,{type:"video/webm"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=s.out+".webm"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+    setStatus($("expStatus"),M.wasCancelled?"中止しました (途中までを保存)。":"書き出し完了: "+s.out+".webm (より高画質にしたい場合は .bat を使ってください)","ok");
+    M.wasCancelled=false;
+  };
+  g.spk.gain.value=0;   // 書き出し中はスピーカー消音 (録画には音が入る)
+  g.master.gain.value=1;
+  M.exporting={cv,cctx,rec};
+  M.wasCancelled=false;
+  $("expProg").style.display="block"; $("expProg").value=0;
+  updateButtons();
+  setStatus($("expStatus"),"ブラウザで書き出し中… タブを表示したままにしてください。");
+  rec.start(250);
+  startPreview(0);
+};
+$("btnWebmCancel").onclick=()=>{ if(M.exporting){ M.wasCancelled=true; stopPreview(); } };
+function finishExport(){
+  const ex=M.exporting;
+  M.exporting=null;
+  try{ ex.rec.stop(); }catch(e){}
+  if(AG){ AG.spk.gain.value=1; AG.master.gain.value=1; }
+  $("expProg").style.display="none";
+  updateButtons();
+}
+document.addEventListener("visibilitychange",()=>{
+  if(M.exporting&&document.hidden)
+    setStatus($("expStatus"),"⚠ タブが隠れています。録画にコマ落ちが発生するため、タブを表示に戻してください。","warn");
+});
+
+/* ============================== persistence ============================== */
+const KEY="bdomtg:v2";
+function store(){
+  try{ return Object.assign({bgms:{},set:null},JSON.parse(localStorage.getItem(KEY)||"{}")); }
+  catch(e){ return {bgms:{},set:null}; }
+}
+let saveT=null;
+function saveSoon(){ clearTimeout(saveT); saveT=setTimeout(saveNow,600); }
+function saveNow(){
+  try{
+    const o=store();
+    if(M.bgm) o.bgms[M.bgm.name+":"+M.bgm.file.size]={bpm:M.beat.bpm,offset:M.beat.offset};
+    o.set={cb:$("clipBeats").value,tb:$("tailBeats").value,res:$("res").value,out:$("outName").value,
+      vol:$("vol").value,cvol:$("cvol").value,mg:$("mergeGap").value,lm:$("lenMode").value,sm:$("spdMode").value};
+    localStorage.setItem(KEY,JSON.stringify(o));
+  }catch(e){}
+}
+(function restore(){
+  const o=store();
+  if(o.set){
+    $("clipBeats").value=o.set.cb||"8"; $("tailBeats").value=o.set.tb||"4";
+    $("res").value=o.set.res||"1920x1080x60";
+    if(o.set.out&&!isAutoName(o.set.out)) $("outName").value=o.set.out;   // カスタム名のみ引き継ぐ
+    if(o.set.vol!=null) $("vol").value=o.set.vol;
+    if(o.set.cvol!=null) $("cvol").value=o.set.cvol;
+    if(o.set.mg!=null) $("mergeGap").value=o.set.mg;
+    if(o.set.lm) $("lenMode").value=o.set.lm;
+    if(o.set.sm) $("spdMode").value=o.set.sm;
+  }
+  freshenName();
+  applyVols();
+})();
+new ResizeObserver(()=>{ drawMtl(); drawWave(); }).observe(document.body);
+refresh();
+</script>
+</body>
+</html>

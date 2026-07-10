@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>MV歌詞字幕メーカー</title>
+<link rel="stylesheet" href="../Style/common.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--pt-font);background:var(--bg);color:var(--tx);font-size:14px}
+h1{font-size:16px;margin:0;font-weight:600}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header .hint{color:var(--tx2);font-size:12px}
+main{display:grid;grid-template-columns:minmax(420px,1.2fr) minmax(380px,1fr);gap:12px;padding:12px;height:calc(100vh - 45px)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;min-height:0}
+.left{gap:8px}
+.videoWrap{position:relative;background:#000;border-radius:6px;overflow:hidden;flex:0 0 auto}
+video{width:100%;max-height:46vh;display:block}
+#sub{position:absolute;left:4%;right:4%;bottom:4%;text-align:center;pointer-events:none;
+  font-weight:700;color:#fff;line-height:1.35;white-space:pre-wrap;
+  text-shadow:0 0 4px #000,2px 2px 2px #000,-2px -2px 2px #000,2px -2px 2px #000,-2px 2px 2px #000}
+#wave{width:100%;height:88px;background:var(--pt-canvas);border-radius:6px;cursor:crosshair;touch-action:none}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button{background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px}
+button:hover{border-color:var(--ac)}
+button.primary{background:var(--ac);border-color:var(--ac);color:#fff}
+button.good{background:var(--ok);border-color:var(--ok);color:#fff}
+button:disabled{opacity:.4;cursor:default}
+input[type=file]{display:none}
+label.file{background:var(--panel2);border:1px dashed var(--tx2);border-radius:6px;padding:6px 12px;cursor:pointer}
+label.file:hover{border-color:var(--ac)}
+textarea{width:100%;flex:1;min-height:120px;background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:8px;font-size:13px;resize:vertical}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tabs button{padding:5px 14px}
+.tabs button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.pane{display:none;flex-direction:column;flex:1;min-height:0}
+.pane.on{display:flex}
+#tableWrap{overflow-y:auto;flex:1;min-height:0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{position:sticky;top:0;background:var(--panel);color:var(--tx2);font-weight:500;text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
+td{padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.cur td{background:rgba(124,107,176,.15)}
+tr.tapNext td{background:rgba(162,112,26,.15)}
+td input.t{width:74px;background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:4px;padding:2px 4px;font-size:12px;font-family:var(--pt-mono)}
+td input.txt{width:100%;background:transparent;color:var(--tx);border:none;font-size:13px}
+td input.txt:focus{outline:1px solid var(--ac);background:var(--panel2)}
+.mini{padding:2px 6px;font-size:11px;border-radius:4px}
+.settings{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:6px 10px;align-items:center;font-size:13px;color:var(--tx2)}
+.settings input,.settings select{background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:4px;padding:4px 6px;width:100%}
+#status{color:var(--tx2);font-size:12px;min-height:16px}
+#tapBanner{display:none;background:var(--warn);color:#fff;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:600}
+kbd{background:var(--pt-btn);border:1px solid var(--line);border-radius:3px;padding:0 5px;font-family:var(--pt-mono);font-size:12px}
+details{font-size:12px;color:var(--tx2)}
+details summary{cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬 MV歌詞字幕メーカー</h1>
+  <span class="hint">動画と歌詞を読み込み → 自動同期 → 微調整 → .ass / .srt / burn.bat を書き出し</span>
+</header>
+<main>
+  <section class="left">
+    <div class="row">
+      <label class="file">📹 動画を開く<input type="file" id="fVideo" accept="video/*,audio/*"></label>
+      <label class="file">📄 歌詞ファイル<input type="file" id="fLyrics" accept=".txt,.lrc"></label>
+      <span id="videoName" class="hint"></span>
+    </div>
+    <div class="videoWrap">
+      <video id="vid" controls></video>
+      <div id="sub"></div>
+    </div>
+    <canvas id="wave" height="88"></canvas>
+    <div class="row">
+      <button id="btnAuto" class="primary" disabled>⚡ 自動同期</button>
+      <button id="btnTap" disabled>⏱ タップ打ち込み</button>
+      <button id="btnAss" class="good" disabled>💾 .ass</button>
+      <button id="btnSrt" disabled>💾 .srt</button>
+      <button id="btnBat" disabled>💾 burn.bat</button>
+      <button id="btnProj" disabled>📦 プロジェクト保存</button>
+      <label class="file">📂 復元<input type="file" id="fProj" accept=".json"></label>
+    </div>
+    <div id="tapBanner">タップモード: 再生しながら <kbd>Enter</kbd>=次の行を開始　<kbd>↓</kbd>=行をここで終了　<kbd>Backspace</kbd>=1行戻る　<kbd>Esc</kbd>=終了</div>
+    <div id="status"></div>
+  </section>
+
+  <section class="right">
+    <div class="tabs">
+      <button id="tabLyr" class="on">歌詞入力</button>
+      <button id="tabTim" >タイミング表</button>
+      <button id="tabSet" >字幕スタイル</button>
+    </div>
+    <div id="paneLyr" class="pane on">
+      <textarea id="lyrics" placeholder="ここに歌詞を貼り付け(1行＝1字幕。空行は無視されます)&#10;&#10;LRC形式 [mm:ss.xx] 付きならタイミングも取り込みます。"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="btnParse" class="primary">→ 行に分解して取り込む</button>
+        <span class="hint" id="parseInfo"></span>
+      </div>
+    </div>
+    <div id="paneTim" class="pane">
+      <div id="tableWrap"><table>
+        <thead><tr><th>#</th><th>開始</th><th>終了</th><th>歌詞</th><th></th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table></div>
+      <div class="row" style="margin-top:6px">
+        <span class="hint">⏱=開始を現在位置に　▶=その行から再生　±0.1s で微調整。時刻は「1:23.45」形式で直接編集可。</span>
+      </div>
+    </div>
+    <div id="paneSet" class="pane">
+      <div class="settings">
+        <span>フォント名(ASS)</span><input id="sFont" value="Meiryo">
+        <span>サイズ(1080p基準)</span><input id="sSize" type="number" value="60">
+        <span>文字色</span><input id="sColor" type="color" value="#ffffff">
+        <span>縁取り色</span><input id="sOutC" type="color" value="#000000">
+        <span>縁取り太さ</span><input id="sOut" type="number" value="3" step="0.5">
+        <span>下端マージン</span><input id="sMarg" type="number" value="50">
+        <span>位置</span><select id="sPos"><option value="2">下</option><option value="8">上</option><option value="5">中央</option></select>
+        <span>行間ギャップ(秒)</span><input id="sGap" type="number" value="0.05" step="0.05">
+      </div>
+      <details style="margin-top:12px"><summary>使い方 / 焼き込み手順</summary>
+        <ol style="line-height:1.7">
+          <li>動画と歌詞を読み込み、「行に分解して取り込む」</li>
+          <li>「自動同期」で音声の歌区間に歌詞を割り付け(目安。精度は音源次第)</li>
+          <li>「タップ打ち込み」で再生しながら Enter で正確に打ち直すのがおすすめ</li>
+          <li>タイミング表で微調整(波形の縦線マーカーもドラッグ可)</li>
+          <li>.ass と burn.bat を保存 → <b>動画と同じフォルダ</b>に置いて burn.bat を実行(ffmpeg が必要)</li>
+        </ol>
+      </details>
+    </div>
+  </section>
+</main>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const vid=$("vid"), sub=$("sub"), wave=$("wave"), tbody=$("tbody"), status_=$("status");
+let videoFile=null, lines=[], rmsFrames=null, frameDur=0.05, audioDur=0;
+let tapMode=false, tapIdx=0, dragging=-1;
+
+/* ---------- utils ---------- */
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function fmt(t){if(t==null||isNaN(t))return"";t=Math.max(0,t);const m=Math.floor(t/60),s=t-m*60;return m+":"+(s<10?"0":"")+s.toFixed(2);}
+function parseT(s){s=s.trim();if(!s)return null;const p=s.split(":");let v=0;for(const x of p)v=v*60+parseFloat(x);return isNaN(v)?null:v;}
+function setStatus(m){status_.textContent=m;}
+function download(name,text){const b=new Blob([text],{type:"application/octet-stream"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5e3);}
+function endOf(i){const l=lines[i];if(l.end!=null)return l.end;const nx=lines[i+1];const g=+$("sGap").value||0;return nx&&nx.start!=null?Math.max(l.start+0.3,nx.start-g):(l.start??0)+4;}
+
+/* ---------- tabs ---------- */
+const panes={tabLyr:"paneLyr",tabTim:"paneTim",tabSet:"paneSet"};
+for(const t in panes)$(t).onclick=()=>{for(const k in panes){$(k).classList.toggle("on",k===t);$(panes[k]).classList.toggle("on",k===t);}};
+
+/* ---------- load video ---------- */
+$("fVideo").onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  videoFile=f;$("videoName").textContent=f.name;
+  vid.src=URL.createObjectURL(f);
+  $("btnTap").disabled=false;refreshExportBtns();
+  setStatus("音声を解析中…");
+  try{
+    const buf=await f.arrayBuffer();
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    const au=await ac.decodeAudioData(buf);ac.close&&ac.close();
+    audioDur=au.duration;
+    const sr=au.sampleRate,hop=Math.floor(sr*frameDur),c0=au.getChannelData(0);
+    const c1=au.numberOfChannels>1?au.getChannelData(1):null;
+    const n=Math.floor(c0.length/hop);rmsFrames=new Float32Array(n);
+    for(let i=0;i<n;i++){let s=0;const o=i*hop;for(let j=0;j<hop;j+=4){const v=c1?(c0[o+j]+c1[o+j])*.5:c0[o+j];s+=v*v;}rmsFrames[i]=Math.sqrt(s/(hop/4));}
+    $("btnAuto").disabled=false;drawWave();setStatus("音声解析完了。");
+  }catch(err){rmsFrames=null;setStatus("⚠ 音声を解析できませんでした(自動同期・波形は使えません): "+err.message);}
+};
+
+/* ---------- lyrics ---------- */
+$("fLyrics").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$("lyrics").value=r.result;parseLyrics();};r.readAsText(f);};
+$("btnParse").onclick=parseLyrics;
+function parseLyrics(){
+  const raw=$("lyrics").value.split(/\r?\n/);lines=[];
+  const lrc=/^\s*\[(\d+):(\d+(?:\.\d+)?)\]\s*/;
+  for(const row of raw){
+    let t=null,txt=row;const m=row.match(lrc);
+    if(m){t=(+m[1])*60+ +m[2];txt=row.replace(lrc,"");}
+    txt=txt.trim();if(!txt)continue;
+    lines.push({text:txt,start:t,end:null});
+  }
+  $("parseInfo").textContent=lines.length+" 行を取り込みました。";
+  renderTable();refreshExportBtns();drawWave();
+  if(lines.length)$("tabTim").click();
+}
+function refreshExportBtns(){const ok=lines.length>0;["btnAss","btnSrt","btnProj"].forEach(id=>$(id).disabled=!ok);$("btnBat").disabled=!(ok&&videoFile);}
+
+/* ---------- auto sync ---------- */
+$("btnAuto").onclick=()=>{
+  if(!rmsFrames||!lines.length){setStatus("動画と歌詞を先に読み込んでください。");return;}
+  const arr=[...rmsFrames].sort((a,b)=>a-b);
+  const lo=arr[Math.floor(arr.length*.2)],hi=arr[Math.floor(arr.length*.95)];
+  const thr=lo+(hi-lo)*.18;
+  const act=rmsFrames.length;const mask=new Uint8Array(act);
+  for(let i=0;i<act;i++)mask[i]=rmsFrames[i]>thr?1:0;
+  // fill gaps <0.4s, drop islands <0.5s
+  fillRuns(mask,0,Math.round(0.4/frameDur));fillRuns(mask,1,Math.round(0.5/frameDur),true);
+  const segs=[];let s=-1;
+  for(let i=0;i<=act;i++){const v=i<act?mask[i]:0;if(v&&s<0)s=i;if(!v&&s>=0){segs.push([s*frameDur,i*frameDur]);s=-1;}}
+  if(!segs.length){setStatus("歌区間を検出できませんでした。タップ打ち込みをご利用ください。");return;}
+  const total=segs.reduce((a,x)=>a+x[1]-x[0],0);
+  const totW=lines.reduce((a,l)=>a+Math.max(2,l.text.length),0);
+  let cw=0;const gap=+$("sGap").value||0;
+  const map=u=>{let acc=0;for(const[a,b]of segs){const d=b-a;if(u<=acc+d)return a+(u-acc);acc+=d;}return segs[segs.length-1][1];};
+  for(const l of lines){
+    const w=Math.max(2,l.text.length);
+    l.start=map(cw/totW*total);
+    l.end=Math.max(l.start+0.5,map((cw+w)/totW*total)-gap);
+    cw+=w;
+  }
+  renderTable();drawWave();
+  setStatus("自動同期しました("+segs.length+" 区間検出)。※目安です。タップ打ち込み・表で微調整してください。");
+};
+function fillRuns(mask,val,maxLen,drop){
+  let s=-1;
+  for(let i=0;i<=mask.length;i++){
+    const v=i<mask.length?mask[i]:1-val;
+    if(v===val&&s<0)s=i;
+    if(v!==val&&s>=0){if(i-s<maxLen)for(let j=s;j<i;j++)mask[j]=drop?0:1;s=-1;}
+  }
+}
+
+/* ---------- tap mode ---------- */
+$("btnTap").onclick=()=>setTap(!tapMode);
+function setTap(on){
+  if(on&&!lines.length){setStatus("先に歌詞を取り込んでください。");return;}
+  tapMode=on;$("tapBanner").style.display=on?"block":"none";
+  $("btnTap").classList.toggle("primary",on);
+  if(on){tapIdx=lines.findIndex(l=>l.start==null);if(tapIdx<0)tapIdx=0;$("tabTim").click();vid.play();}
+  renderTable();
+}
+document.addEventListener("keydown",e=>{
+  if(!tapMode)return;
+  if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
+  const t=vid.currentTime;
+  if(e.key==="Enter"){
+    e.preventDefault();
+    if(tapIdx<lines.length){
+      lines[tapIdx].start=t;
+      if(tapIdx>0&&(lines[tapIdx-1].end==null||lines[tapIdx-1].end>t))lines[tapIdx-1].end=t-(+$("sGap").value||0);
+      tapIdx++;renderTable();drawWave();
+      if(tapIdx>=lines.length){setTap(false);setStatus("全行の打ち込みが完了しました。");}
+    }
+  }else if(e.key==="ArrowDown"){
+    e.preventDefault();if(tapIdx>0)lines[tapIdx-1].end=t;renderTable();
+  }else if(e.key==="Backspace"){
+    e.preventDefault();
+    if(tapIdx>0){tapIdx--;lines[tapIdx].start=null;lines[tapIdx].end=null;if(tapIdx>0)lines[tapIdx-1].end=null;renderTable();drawWave();}
+  }else if(e.key==="Escape"){setTap(false);}
+});
+
+/* ---------- table ---------- */
+function renderTable(){
+  tbody.innerHTML="";
+  lines.forEach((l,i)=>{
+    const tr=document.createElement("tr");
+    if(tapMode&&i===tapIdx)tr.className="tapNext";
+    tr.innerHTML=`<td>${i+1}</td>
+      <td><input class="t" data-i="${i}" data-k="start" value="${fmt(l.start)}"></td>
+      <td><input class="t" data-i="${i}" data-k="end" value="${fmt(l.end)}" placeholder="(自動)"></td>
+      <td><input class="txt" data-i="${i}" data-k="text" value="${l.text.replace(/"/g,"&quot;")}"></td>
+      <td style="white-space:nowrap">
+        <button class="mini" data-a="stamp" data-i="${i}" title="開始＝現在位置">⏱</button>
+        <button class="mini" data-a="play" data-i="${i}" title="この行から再生">▶</button>
+        <button class="mini" data-a="m" data-i="${i}">-0.1</button>
+        <button class="mini" data-a="p" data-i="${i}">+0.1</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+tbody.addEventListener("change",e=>{
+  const i=+e.target.dataset.i,k=e.target.dataset.k;if(k==null)return;
+  if(k==="text")lines[i].text=e.target.value;
+  else lines[i][k]=parseT(e.target.value);
+  drawWave();
+});
+tbody.addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const i=+b.dataset.i,l=lines[i];
+  if(b.dataset.a==="stamp"){l.start=vid.currentTime;}
+  if(b.dataset.a==="play"){if(l.start!=null){vid.currentTime=Math.max(0,l.start-0.6);vid.play();}return;}
+  if(b.dataset.a==="m"&&l.start!=null){l.start=Math.max(0,l.start-0.1);if(l.end!=null)l.end-=0.1;}
+  if(b.dataset.a==="p"&&l.start!=null){l.start+=0.1;if(l.end!=null)l.end+=0.1;}
+  renderTable();drawWave();
+});
+
+/* ---------- preview overlay ---------- */
+function tick(){
+  const t=vid.currentTime;let txt="",cur=-1;
+  for(let i=0;i<lines.length;i++){const l=lines[i];if(l.start!=null&&t>=l.start&&t<endOf(i)){txt=l.text;cur=i;break;}}
+  sub.textContent=txt;
+  sub.style.fontSize=Math.round(vid.clientWidth/1920*(+$("sSize").value||60)*1.0)+"px";
+  sub.style.color=$("sColor").value;
+  const oc=$("sOutC").value;
+  sub.style.textShadow=`0 0 4px ${oc},2px 2px 2px ${oc},-2px -2px 2px ${oc},2px -2px 2px ${oc},-2px 2px 2px ${oc}`;
+  const pos=$("sPos").value;
+  sub.style.bottom=pos==="2"?"4%":"auto";sub.style.top=pos==="8"?"4%":pos==="5"?"45%":"auto";
+  // highlight current row
+  [...tbody.children].forEach((tr,i)=>tr.classList.toggle("cur",i===cur));
+  drawPlayhead();
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+/* ---------- waveform ---------- */
+let waveW=0;
+function drawWave(){
+  const dpr=window.devicePixelRatio||1;
+  waveW=wave.clientWidth;wave.width=waveW*dpr;wave.height=88*dpr;
+  const ctx=wave.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,waveW,88);
+  const dur=audioDur||vid.duration||0;if(!dur)return;
+  if(rmsFrames){
+    const max=Math.max(...rmsFrames)||1;
+    ctx.fillStyle="#3d3660";
+    for(let x=0;x<waveW;x++){
+      const i=Math.floor(x/waveW*rmsFrames.length);
+      const h=clamp(rmsFrames[i]/max*80,1,80);
+      ctx.fillRect(x,44-h/2,1,h);
+    }
+  }
+  ctx.fillStyle="rgba(167,139,250,.85)";
+  for(const l of lines){if(l.start==null)continue;const x=l.start/dur*waveW;ctx.fillRect(x-0.5,0,1.5,88);}
+}
+let phX=-1;
+function drawPlayhead(){
+  const dur=audioDur||vid.duration||0;if(!dur||!waveW)return;
+  const x=vid.currentTime/dur*waveW;
+  if(Math.abs(x-phX)<0.5)return;
+  drawWaveStatic();phX=x;
+  const ctx=wave.getContext("2d");ctx.fillStyle="#e8b45a";
+  ctx.fillRect(x*(window.devicePixelRatio||1)/(window.devicePixelRatio||1)-1,0,2,88);
+}
+function drawWaveStatic(){drawWave();}
+window.addEventListener("resize",drawWave);
+
+wave.addEventListener("pointerdown",e=>{
+  const dur=audioDur||vid.duration||0;if(!dur)return;
+  const r=wave.getBoundingClientRect(),x=e.clientX-r.left;
+  dragging=-1;
+  for(let i=0;i<lines.length;i++){
+    if(lines[i].start==null)continue;
+    if(Math.abs(lines[i].start/dur*waveW-x)<5){dragging=i;break;}
+  }
+  if(dragging<0)vid.currentTime=x/waveW*dur;
+  wave.setPointerCapture(e.pointerId);
+});
+wave.addEventListener("pointermove",e=>{
+  if(dragging<0)return;
+  const dur=audioDur||vid.duration||0;
+  const r=wave.getBoundingClientRect();
+  const t=clamp((e.clientX-r.left)/waveW*dur,0,dur);
+  const l=lines[dragging];
+  if(l.end!=null)l.end+=t-l.start;
+  l.start=t;renderTable();drawWave();
+});
+wave.addEventListener("pointerup",()=>dragging=-1);
+
+/* ---------- export ---------- */
+function baseName(){return videoFile?videoFile.name.replace(/\.[^.]+$/,""):"subs";}
+function assColor(hex){return "&H00"+hex.slice(5,7).toUpperCase()+hex.slice(3,5).toUpperCase()+hex.slice(1,3).toUpperCase();}
+function assTime(t){t=Math.max(0,t);const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=Math.floor(t%60),c=Math.round(t%1*100);return h+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+"."+String(c).padStart(2,"0");}
+function srtTime(t){t=Math.max(0,t);const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=Math.floor(t%60),ms=Math.round(t%1*1000);return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+","+String(ms).padStart(3,"0");}
+function timedLines(){return lines.map((l,i)=>({...l,end:endOf(i)})).filter(l=>l.start!=null);}
+
+$("btnAss").onclick=()=>{
+  const st=timedLines();if(!st.length){setStatus("タイミングが1行も設定されていません。");return;}
+  const align=$("sPos").value;
+  let out="[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n";
+  out+="[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n";
+  out+=`Style: Default,${$("sFont").value},${+$("sSize").value||60},${assColor($("sColor").value)},&H000000FF,${assColor($("sOutC").value)},&H80000000,-1,0,0,0,100,100,0,0,1,${+$("sOut").value||3},1,${align},60,60,${+$("sMarg").value||50},1\n\n`;
+  out+="[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+  for(const l of st){
+    const txt=l.text.replace(/[{}]/g,"").replace(/\n/g,"\\N");
+    out+=`Dialogue: 0,${assTime(l.start)},${assTime(l.end)},Default,,0,0,0,,${txt}\n`;
+  }
+  download(baseName()+".ass",out);
+  setStatus(baseName()+".ass を保存しました。動画と同じフォルダに置いてください。");
+};
+
+$("btnSrt").onclick=()=>{
+  const st=timedLines();if(!st.length){setStatus("タイミングが1行も設定されていません。");return;}
+  let out="";st.forEach((l,i)=>{out+=(i+1)+"\n"+srtTime(l.start)+" --> "+srtTime(l.end)+"\n"+l.text+"\n\n";});
+  download(baseName()+".srt",out);setStatus(".srt を保存しました。");
+};
+
+$("btnBat").onclick=()=>{
+  const vn=videoFile.name,bn=baseName();
+  const bat=`@echo off
+chcp 65001 >nul
+cd /d "%~dp0"
+rem === ${vn} に字幕 ${bn}.ass を焼き込みます(このbat・動画・assを同じフォルダに置く) ===
+where ffmpeg >nul 2>nul || (echo ffmpeg が見つかりません。https://ffmpeg.org からインストールして PATH を通してください。& pause & exit /b 1)
+ffmpeg -y -i "${vn}" -vf "ass=${bn}.ass" -c:v libx264 -crf 18 -preset medium -c:a copy "${bn}_sub.mp4"
+rem GPU(NVIDIA)を使う場合は上の行を消して下を有効化:
+rem ffmpeg -y -i "${vn}" -vf "ass=${bn}.ass" -c:v h264_nvenc -cq 19 -c:a copy "${bn}_sub.mp4"
+echo.
+echo 完了: ${bn}_sub.mp4
+pause
+`;
+  download("burn_"+bn+".bat",bat.replace(/\n/g,"\r\n"));
+  setStatus("burn.bat を保存しました。動画・.ass と同じフォルダに置いて実行してください。");
+};
+
+/* ---------- project save/load ---------- */
+$("btnProj").onclick=()=>{
+  download(baseName()+"_project.json",JSON.stringify({video:videoFile?.name??null,lines,settings:{
+    font:$("sFont").value,size:$("sSize").value,color:$("sColor").value,outc:$("sOutC").value,
+    out:$("sOut").value,marg:$("sMarg").value,pos:$("sPos").value,gap:$("sGap").value}},null,1));
+  setStatus("プロジェクトを保存しました。");
+};
+$("fProj").onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{
+    const p=JSON.parse(r.result);lines=p.lines||[];
+    const s=p.settings||{};if(s.font)$("sFont").value=s.font;if(s.size)$("sSize").value=s.size;
+    if(s.color)$("sColor").value=s.color;if(s.outc)$("sOutC").value=s.outc;if(s.out)$("sOut").value=s.out;
+    if(s.marg)$("sMarg").value=s.marg;if(s.pos)$("sPos").value=s.pos;if(s.gap)$("sGap").value=s.gap;
+    renderTable();refreshExportBtns();drawWave();$("tabTim").click();
+    setStatus("プロジェクトを復元しました。"+(p.video?("(動画: "+p.video+" を開き直してください)"):"。"));
+  }catch(err){setStatus("復元に失敗: "+err.message);}};
+  r.readAsText(f);
+};
+</script>
+</body>
+</html>

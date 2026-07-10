@@ -1,0 +1,79 @@
+/* ============================================================
+   PlantainToolsHTML 共通デザインシステム
+   テーマ: ライト × 灰みの薄紫ベース + 相性のいい多色アクセント
+   各ツールの HTML から <link rel="stylesheet" href="../Style/common.css">
+   で読み込む。色は必ずここで定義したトークンを使うこと。
+   ※ 波形・タイムライン等の描画キャンバスは視認性のため暗背景
+     (--pt-canvas) を維持する。
+   ============================================================ */
+
+:root{
+  /* ---- ベース (灰みの薄紫) ---- */
+  --pt-bg:        #e9e6f0;   /* ページ背景 */
+  --pt-panel:     #f3f1f8;   /* ヘッダー・パネル背景 */
+  --pt-card:      #fbfafd;   /* カード背景 */
+  --pt-field:     #ffffff;   /* 入力欄背景 */
+  --pt-btn:       #e7e3f0;   /* ボタン背景 */
+  --pt-btn-hover: #d9d3e8;   /* ボタンhover */
+  --pt-hover:     #efecf5;   /* 行hover */
+  --pt-line:      #cfc9de;   /* 罫線・ボーダー */
+  --pt-line-soft: #e4e0ec;   /* 弱い罫線 (リスト区切り) */
+  --pt-fg:        #322d3d;   /* 基本文字色 */
+  --pt-dim:       #615b74;   /* 補助文字色 */
+
+  /* ---- アクセント (灰紫 + 相性色) ---- */
+  --pt-accent:    #6f5fa6;   /* メイン: 灰紫 */
+  --pt-accent-2:  #3f7b96;   /* サブ: くすみブルー */
+  --pt-on-accent: #ffffff;   /* アクセント上の文字色 */
+
+  /* ---- 状態カラー (ライト背景で読める濃さ) ---- */
+  --pt-ok:        #27825a;   /* 成功: グリーン */
+  --pt-warn:      #94660e;   /* 警告: アンバー */
+  --pt-danger:    #c2455e;   /* 危険・KILL: コーラル */
+  --pt-info:      #4f63b5;   /* 情報・DEATH: ブルー */
+
+  /* ---- マーカー (タイムライン系。暗背景キャンバス上でも判別可) ---- */
+  --pt-beat:      #997012;   /* 拍・手動マーカー: ゴールド */
+  --pt-bar:       #a85818;   /* 小節マーカー: オレンジ */
+
+  /* ---- 描画キャンバス用の暗背景 ---- */
+  --pt-canvas:    #232030;   /* 波形・タイムラインの背景 */
+
+  /* ---- 形状・タイポグラフィ ---- */
+  --pt-radius: 14px;
+  --pt-font: "Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic UI","Segoe UI",sans-serif;
+  --pt-mono: Consolas,"SF Mono","Cascadia Mono",monospace;
+
+  /* ============================================
+     レガシー別名 (各ツールの既存変数名 → 共通トークン)
+     ============================================ */
+  /* BDO 系 */
+  --bg: var(--pt-bg); --panel: var(--pt-panel); --card: var(--pt-card);
+  --line: var(--pt-line); --fg: var(--pt-fg); --dim: var(--pt-dim);
+  --acc: var(--pt-accent); --kill: var(--pt-danger); --death: var(--pt-info);
+  --manual: var(--pt-beat); --beat: var(--pt-beat); --bar: var(--pt-bar);
+  /* lyric-subtitler 系 */
+  --panel2: var(--pt-btn); --tx: var(--pt-fg); --tx2: var(--pt-dim);
+  --ac: var(--pt-accent); --ok: var(--pt-ok); --warn: var(--pt-warn);
+  /* one-sec / oto-hame 系 */
+  --text: var(--pt-fg); --sub: var(--pt-dim);
+  --accent: var(--pt-accent); --accent2: var(--pt-accent-2);
+  --border: var(--pt-line); --radius: var(--pt-radius);
+}
+
+/* ---- ベース ---- */
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{
+  margin:0;
+  background:var(--pt-bg);
+  color:var(--pt-fg);
+  font-family:var(--pt-font);
+  font-size:14px;
+  line-height:1.55;
+}
+code,kbd,pre,samp{font-family:var(--pt-mono)}
+
+/* ---- フォーム部品の共通挙動 ---- */
+input,select,textarea,button{font-family:inherit}
+input[type=checkbox],input

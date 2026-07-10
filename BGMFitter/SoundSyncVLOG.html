@@ -4,15 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>音ハメVLOGメーカー</title>
+<link rel="stylesheet" href="../Style/common.css">
 <style>
-  :root{
-    --bg:#0f1117; --panel:#1a1e2a; --panel2:#232838; --text:#e8eaf0;
-    --sub:#8b93a7; --accent:#ff5c7a; --accent2:#5cc8ff; --ok:#4ade80;
-    --border:#2e3448; --radius:14px;
-  }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
-    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP",sans-serif;
+    font-family:var(--pt-font);
     background:var(--bg); color:var(--text); min-height:100vh; padding:24px 16px 80px;
   }
   .wrap{max-width:980px; margin:0 auto;}
@@ -32,7 +28,7 @@
     border:2px dashed var(--border); border-radius:var(--radius); padding:22px;
     text-align:center; color:var(--sub); cursor:pointer; transition:.15s; font-size:14px;
   }
-  .dropzone:hover,.dropzone.over{border-color:var(--accent2); color:var(--accent2); background:rgba(92,200,255,.05);}
+  .dropzone:hover,.dropzone.over{border-color:var(--accent2); color:var(--accent2); background:rgba(124,107,176,.08);}
   .clips{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; margin-top:14px;}
   .clip{
     background:var(--panel2); border:1px solid var(--border); border-radius:10px;
@@ -85,7 +81,7 @@
   .stats{color:var(--sub); font-size:13px; margin-top:10px;}
   .stats b{color:var(--text);}
   canvas#timeline{
-    width:100%; height:130px; background:#0a0c12; border:1px solid var(--border);
+    width:100%; height:130px; background:var(--pt-canvas); border:1px solid var(--border);
     border-radius:10px; display:block; margin-top:14px; cursor:pointer;
   }
   .scorechip{
@@ -116,7 +112,7 @@
   <!-- クリップ -->
   <section>
     <h2>🎬 クリップ <span class="badge" id="clipCount">0本</span></h2>
-    <div class="dropzone" id="dropzone">動画ファイルをドロップ / クリックで選択（複数可）</div>
+    <div class="dropzone" id="dropzone">動画ファイルをドロップ / クリックで選択(複数可)</div>
     <input type="file" id="fileInput" accept="video/*" multiple>
     <div class="clips" id="clipList"></div>
     <div class="row" id="clipActions" style="margin-top:10px; display:none">
@@ -126,7 +122,7 @@
     </div>
     <p class="hint">切り出し位置や尺はアルゴリズムが決めるので、素材は長いままでOK。<br>
     同じクリップの別シーンが複数回使われることもあります。<br>
-    🔊/🔇は書き出し動画にそのクリップの音を入れるかどうかです（解析には常に音を使います）。<br>
+    🔊/🔇は書き出し動画にそのクリップの音を入れるかどうかです(解析には常に音を使います)。<br>
     「順番通り」モードではサムネイルのドラッグ順が使われます。</p>
   </section>
 
@@ -141,7 +137,7 @@
       <span class="chip">尺 <b id="bgmDur">-</b> 秒</span>
       <button class="btn small" id="bgmRemove">BGMを外す</button>
     </div>
-    <p class="hint">BGM全体（末尾の無音は自動カット）をクリップで埋めます。<br>完成尺 = BGMの尺です。</p>
+    <p class="hint">BGM全体(末尾の無音は自動カット)をクリップで埋めます。<br>完成尺 = BGMの尺です。</p>
   </section>
 
   <!-- 音ハメ設計 -->
@@ -150,7 +146,7 @@
     <div class="row">
       <label class="lbl">クリップの並び
         <select id="orderSel">
-          <option value="auto">自動で最適化（精度優先）</option>
+          <option value="auto">自動で最適化(精度優先)</option>
           <option value="fixed">登録した順番通り</option>
         </select>
       </label>
@@ -167,7 +163,7 @@
     <p class="stats" id="anaStatus"></p>
     <div class="scorechip" id="scoreChip">音ハメ度 <b id="scoreVal">-</b><span id="segCount"></span></div>
     <canvas id="timeline" height="130"></canvas>
-    <p class="hint">上段の色帯が各カット（数字=クリップ番号、×は再生速度）、下段の波形がBGMの音の強弱です。<br><b>カットをクリックすると別の候補（同スコア帯の別シーン/速度）に差し替え</b>できます。</p>
+    <p class="hint">上段の色帯が各カット(数字=クリップ番号、×は再生速度)、下段の波形がBGMの音の強弱です。<br><b>カットをクリックすると別の候補(同スコア帯の別シーン/速度)に差し替え</b>できます。</p>
   </section>
 
   <!-- 書き出し -->
@@ -202,10 +198,11 @@
       <video id="resultVideo" controls playsinline></video><br>
       <a class="dl" id="dlLink" download>⬇ ダウンロード</a>
     </div>
-    <p class="hint">「動画に書き出す」は実時間再生しながら録画します（完成尺と同じ時間がかかります）。書き出し中はタブを閉じたり切り替えたりしないでください。<br>
+    <p class="hint">「動画に書き出す」は実時間再生しながら録画します(完成尺と同じ時間がかかります)。<br>
+    書き出し中はタブを閉じたり切り替えたりしないでください。<br>
     「<b>⚡ ffmpegで高速書き出し</b>」は解析結果を .bat ファイルに変換してダウンロードします。<br>
-    <b>素材の動画・BGMファイルと同じフォルダ</b>に置いてダブルクリックすると、ffmpeg が実時間を待たずに高画質（libx264 CRF17 / NVIDIA GPUがあれば自動でNVENC）で書き出します。<br>
-    fmpeg 4.4以降のインストールが必要です（例: winget install Gyan.FFmpeg）。</p>
+    <b>素材の動画・BGMファイルと同じフォルダ</b>に置いてダブルクリックすると、ffmpeg が実時間を待たずに高画質(libx264 CRF17 / NVIDIA GPUがあれば自動でNVENC)で書き出します。<br>
+    ffmpeg 4.4以降のインストールが必要です(例: winget install Gyan.FFmpeg)。</p>
   </section>
 </div>
 
@@ -378,14 +375,14 @@ function renderClips(){
     const card = document.createElement("div");
     card.className = "clip";
     card.innerHTML = `
-      <div class="thumbwrap" draggable="true" title="ドラッグで並べ替え（「順番通り」モードで有効）">
+      <div class="thumbwrap" draggable="true" title="ドラッグで並べ替え(「順番通り」モードで有効)">
         <img alt="">
         <span class="num">${i+1}</span>
         <button class="del" title="削除">✕</button>
       </div>
       <div class="body">
         <div class="name">${escapeHtml(clip.name)}</div>
-        <div class="meta"><span>${clip.duration ? clip.duration.toFixed(1)+"秒" : "読込中…"}</span><span class="envstat"></span></div>
+        <div class="meta"><span>${clip.duration ? clip.duration.toFixed(1)+"秒" : "読み込み中…"}</span><span class="envstat"></span></div>
         <div class="ctrlrow"><button class="aud"></button></div>
       </div>`;
     card.querySelector(".num").style.borderLeftColor = clipColor(i);
@@ -434,7 +431,7 @@ function renderClips(){
     list.appendChild(card);
   });
   if(!clips.length){
-    list.innerHTML = `<p class="empty" style="grid-column:1/-1">まだクリップがありません</p>`;
+    list.innerHTML = `<p class="empty" style="grid-column:1/-1">まだクリップがありません。</p>`;
   }
 }
 function refreshStats(){
@@ -477,7 +474,7 @@ async function decodeAudio(blob){
   const octx = new OfflineAudioContext(1, 1, 22050);
   return octx.decodeAudioData(arr);
 }
-// クリップの包絡を用意（IndexedDBキャッシュ付き）
+// クリップの包絡を用意(IndexedDBキャッシュ付き)
 async function ensureClipEnv(clip){
   if(clip.envReady) return;
   const cached = await idbGet("envs", clip.fileId);
@@ -532,10 +529,10 @@ async function setBgm(file){
 }
 function detectBeats(env){
   const n = env.n;
-  // オンセット（RMS増分）
+  // オンセット(RMS増分)
   const flux = new Float32Array(n);
   for(let i=1; i<n; i++) flux[i] = Math.max(0, env.rms[i] - env.rms[i-1]);
-  // 自己相関でテンポ推定（55〜200 BPM）
+  // 自己相関でテンポ推定(55〜200 BPM)
   const minLag = Math.round(FPS * 60 / 200);
   const maxLag = Math.min(n - 1, Math.round(FPS * 60 / 55));
   let bestLag = Math.round(FPS * 0.5), best = -1;
@@ -547,7 +544,7 @@ function detectBeats(env){
   }
   const beatInterval = bestLag / FPS;
   const bpm = 60 / beatInterval;
-  // 最初のビート位相（コムフィルタ）
+  // 最初のビート位相(コムフィルタ)
   let bestPhase = 0, bestSum = -1;
   for(let p=0; p<bestLag; p++){
     let s = 0, cnt = 0;
@@ -619,7 +616,7 @@ function resampleNorm(src, f0, f1, L){
   let v = 0;
   for(let k=0; k<L; k++){ out[k] -= m; v += out[k]*out[k]; }
   const s = Math.sqrt(v / L);
-  if(s < 1e-4) return null; // 平坦（無音区間など）→ 形状情報なし
+  if(s < 1e-4) return null; // 平坦(無音区間など)→ 形状情報なし
   for(let k=0; k<L; k++) out[k] /= s;
   return out;
 }
@@ -659,7 +656,7 @@ async function analyze(){
     // 2) セグメント分割
     const segs = buildSegments();
     // 3) 各セグメントに最適な (クリップ, 窓, 速度) を割り当て
-    const P1 = new Map(), P2 = new Map(); // 累積和（平均・分散を O(1) で出すため）
+    const P1 = new Map(), P2 = new Map(); // 累積和(平均・分散を O(1) で出すため)
     for(const c of usable){
       const n = c.env.n, z = c.env.z;
       const p1 = new Float64Array(n+1), p2 = new Float64Array(n+1);
@@ -676,7 +673,7 @@ async function analyze(){
       let muB = 0;
       for(let i=f0; i<f1; i++) muB += bgm.z[i];
       muB /= (f1 - f0);
-      // 探索対象クリップ（順番通りモードでは割当クリップのみ）
+      // 探索対象クリップ(順番通りモードでは割当クリップのみ)
       let targets = usable;
       if(settings.order === "fixed" && clips.length){
         const c = clips[Math.floor(j * clips.length / segs.length)] || clips[clips.length-1];
@@ -722,7 +719,7 @@ async function analyze(){
         const s = Math.max(0, Math.min(c.duration - need, (j * 1.7) % Math.max(0.1, c.duration - need)));
         top.push({clipId: c.id, s, rate: 0.8, corr: 0, base: 0});
       }
-      // ペナルティ（同一クリップ連続 / 使用済み区間との重複）を加味して選択
+      // ペナルティ(同一クリップ連続 / 使用済み区間との重複)を加味して選択
       let pick = 0, bestEff = -1e9;
       for(let k=0; k<top.length; k++){
         const cand = top[k];
@@ -760,7 +757,7 @@ function updateScore(){
   for(const seg of plan.segs) s += Math.max(0, seg.cands[seg.pick].corr);
   const score = Math.round(100 * s / plan.segs.length);
   $("scoreVal").textContent = score + "%";
-  $("segCount").textContent = `（${plan.segs.length}カット）`;
+  $("segCount").textContent = `(${plan.segs.length}カット)`;
   $("scoreChip").style.display = "flex";
 }
 async function savePlan(){
@@ -780,19 +777,19 @@ function renderTimeline(){
   const ctx = cv.getContext("2d");
   ctx.clearRect(0, 0, W, H);
   if(!bgm){
-    ctx.fillStyle = "#8b93a7";
+    ctx.fillStyle = "#9c95ba";
     ctx.font = `${12*dpr}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("BGMを追加して「解析」を押すと、ここに音ハメ案が表示されます", W/2, H/2);
+    ctx.fillText("BGMを追加して「解析」を押すと、ここに音ハメ案が表示されます。", W/2, H/2);
     return;
   }
   const dur = bgm.effDur;
   const bandH = 30 * dpr, waveTop = bandH + 6 * dpr;
-  // BGM波形（RMS包絡）
+  // BGM波形(RMS包絡)
   let mx = 0;
   const nEff = Math.min(bgm.n, Math.round(dur * FPS));
   for(let i=0; i<nEff; i++) if(bgm.rms[i] > mx) mx = bgm.rms[i];
-  ctx.fillStyle = "rgba(92,200,255,.45)";
+  ctx.fillStyle = "rgba(167,139,250,.45)";
   const waveH = H - waveTop;
   for(let px=0; px<W; px++){
     const i = Math.min(nEff-1, Math.floor(px / W * nEff));
@@ -956,7 +953,7 @@ async function runSequence(record){
       v.muted = !clip.audioOn;
       if(Math.abs(v.currentTime - ch.s) > 0.05) await seekTo(v, ch.s);
       try{ await v.play(); }catch(e){}
-      // 次セグメントを先読みシーク（別のクリップのときだけ）
+      // 次セグメントを先読みシーク(別のクリップのときだけ)
       if(i + 1 < segs.length){
         const nx = segs[i+1].cands[segs[i+1].pick];
         const nclip = byId.get(nx.clipId);
@@ -1112,7 +1109,7 @@ function buildFfmpegBat(){
     const srcDur = fmtT(seg.dur * ch.rate);
     lines.push(`[${idx}:v]trim=start=${fmtT(ch.s)}:duration=${srcDur},setpts=(PTS-STARTPTS)/${ch.rate},fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,format=yuv420p[v${i}];`);
     if(c.audioOn && c.env){
-      // atempo はピッチを保ったまま速度変更（ブラウザ版の preservesPitch と同等）
+      // atempo はピッチを保ったまま速度変更(ブラウザ版の preservesPitch と同等)
       lines.push(`[${idx}:a]atrim=start=${fmtT(ch.s)}:duration=${srcDur},asetpts=PTS-STARTPTS,atempo=${ch.rate},${AF},volume=${clipVol},apad,atrim=duration=${fmtT(seg.dur)}[a${i}];`);
     }else{
       lines.push(`anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${fmtT(seg.dur)}[a${i}];`);

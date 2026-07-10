@@ -124,7 +124,10 @@
       <button class="btn small" id="allAudOffBtn">🔇 全クリップ音声なし</button>
       <button class="btn small" id="clearClipsBtn">🗑 クリップをすべて解除</button>
     </div>
-    <p class="hint">切り出し位置や尺はアルゴリズムが決めるので、素材は長いままでOK。同じクリップの別シーンが複数回使われることもあります。🔊/🔇は書き出し動画にそのクリップの音を入れるかどうかです（解析には常に音を使います）。「順番通り」モードではサムネイルのドラッグ順が使われます。</p>
+    <p class="hint">切り出し位置や尺はアルゴリズムが決めるので、素材は長いままでOK。<br>
+    同じクリップの別シーンが複数回使われることもあります。<br>
+    🔊/🔇は書き出し動画にそのクリップの音を入れるかどうかです（解析には常に音を使います）。<br>
+    「順番通り」モードではサムネイルのドラッグ順が使われます。</p>
   </section>
 
   <!-- BGM -->
@@ -138,7 +141,7 @@
       <span class="chip">尺 <b id="bgmDur">-</b> 秒</span>
       <button class="btn small" id="bgmRemove">BGMを外す</button>
     </div>
-    <p class="hint">BGM全体（末尾の無音は自動カット）をクリップで埋めます。完成尺 = BGMの尺です。</p>
+    <p class="hint">BGM全体（末尾の無音は自動カット）をクリップで埋めます。<br>完成尺 = BGMの尺です。</p>
   </section>
 
   <!-- 音ハメ設計 -->
@@ -164,7 +167,7 @@
     <p class="stats" id="anaStatus"></p>
     <div class="scorechip" id="scoreChip">音ハメ度 <b id="scoreVal">-</b><span id="segCount"></span></div>
     <canvas id="timeline" height="130"></canvas>
-    <p class="hint">上段の色帯が各カット（数字=クリップ番号、×は再生速度）、下段の波形がBGMの音の強弱です。<b>カットをクリックすると別の候補（同スコア帯の別シーン/速度）に差し替え</b>できます。</p>
+    <p class="hint">上段の色帯が各カット（数字=クリップ番号、×は再生速度）、下段の波形がBGMの音の強弱です。<br><b>カットをクリックすると別の候補（同スコア帯の別シーン/速度）に差し替え</b>できます。</p>
   </section>
 
   <!-- 書き出し -->
@@ -190,6 +193,7 @@
     <div class="row" style="margin-top:10px">
       <button class="btn" id="previewBtn">▶ プレビュー</button>
       <button class="btn primary" id="exportBtn">⏺ 動画に書き出す</button>
+      <button class="btn" id="ffmpegBtn">⚡ ffmpegで高速書き出し (.bat)</button>
       <button class="btn small" id="stopBtn" style="display:none">■ 停止</button>
     </div>
     <canvas id="stage" width="1280" height="720"></canvas>
@@ -198,7 +202,10 @@
       <video id="resultVideo" controls playsinline></video><br>
       <a class="dl" id="dlLink" download>⬇ ダウンロード</a>
     </div>
-    <p class="hint">書き出しは実時間再生しながら録画します（完成尺と同じ時間がかかります）。書き出し中はタブを閉じたり切り替えたりしないでください。</p>
+    <p class="hint">「動画に書き出す」は実時間再生しながら録画します（完成尺と同じ時間がかかります）。書き出し中はタブを閉じたり切り替えたりしないでください。<br>
+    「<b>⚡ ffmpegで高速書き出し</b>」は解析結果を .bat ファイルに変換してダウンロードします。<br>
+    <b>素材の動画・BGMファイルと同じフォルダ</b>に置いてダブルクリックすると、ffmpeg が実時間を待たずに高画質（libx264 CRF17 / NVIDIA GPUがあれば自動でNVENC）で書き出します。<br>
+    fmpeg 4.4以降のインストールが必要です（例: winget install Gyan.FFmpeg）。</p>
   </section>
 </div>
 
@@ -837,13 +844,17 @@ function ensureAudio(){
   if(audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
-function setupStage(){
+function calcStageSize(){
   const [aw, ah] = settings.aspect === "16:9" ? [16,9] : settings.aspect === "9:16" ? [9,16] : [1,1];
   const base = settings.res === "1080" ? 1080 : 720;
   let W, H;
   if(aw >= ah){ H = base; W = Math.round(base * aw / ah); }
   else{ W = base; H = Math.round(base * ah / aw); }
   W += W % 2; H += H % 2;
+  return [W, H];
+}
+function setupStage(){
+  const [W, H] = calcStageSize();
   stage.width = W; stage.height = H;
   return [W, H];
 }
@@ -994,6 +1005,133 @@ async function runSequence(record){
   }
 }
 
+/* ================= ffmpeg .bat 書き出し =================
+   解析結果(plan)を ffmpeg の filter_complex に変換し、
+   素材と同じフォルダに置いて実行する Windows バッチを生成する。
+   実時間録画と違い、ffmpeg が直接エンコードするので高速・高画質。 */
+function fmtT(x){ return String(Math.round(x * 1000) / 1000); }
+function batEsc(s){ return s.replace(/%/g, "%%"); }
+function stamp(){
+  const d = new Date();
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+}
+function downloadBat(text, name){
+  const url = URL.createObjectURL(new Blob([text], {type: "application/octet-stream"}));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+}
+// UTF-8(BOMなし)+CRLF で保存し、冒頭の chcp 65001 で日本語ファイル名に対応する
+function buildBatText(o){
+  const B = [];
+  B.push("@echo off");
+  B.push("chcp 65001 >nul");
+  B.push('cd /d "%~dp0"');
+  B.push("setlocal EnableExtensions");
+  B.push(`title ${o.title}`);
+  B.push("");
+  B.push("where ffmpeg >nul 2>nul");
+  B.push("if errorlevel 1 (");
+  B.push("  echo [エラー] ffmpeg が見つかりません。");
+  B.push("  echo 例: winget install Gyan.FFmpeg でインストールし、新しいウィンドウで再実行してください。");
+  B.push("  pause");
+  B.push("  exit /b 1");
+  B.push(")");
+  B.push("");
+  B.push('set "MISSING="');
+  for(const n of o.inputs){
+    B.push(`if not exist "${batEsc(n)}" echo [エラー] 素材が見つかりません: "${batEsc(n)}" && set "MISSING=1"`);
+  }
+  B.push("if defined MISSING (");
+  B.push("  echo この .bat を素材の動画・音楽ファイルと同じフォルダに置いて実行してください。");
+  B.push("  pause");
+  B.push("  exit /b 1");
+  B.push(")");
+  B.push("");
+  B.push("rem NVIDIA GPU が使えれば NVENC で高速エンコード / なければ libx264 高品質設定");
+  B.push('set "VARGS=-c:v libx264 -preset medium -crf 17"');
+  B.push('ffmpeg -hide_banner -loglevel error -f lavfi -i color=black:s=64x64:d=0.1 -c:v h264_nvenc -f null - >nul 2>nul && set "VARGS=-c:v h264_nvenc -preset p6 -tune hq -rc vbr -cq 19 -b:v 0"');
+  B.push("echo エンコード設定: %VARGS%");
+  B.push("");
+  B.push('set "FILTER=%TEMP%\\vlog_filter_%RANDOM%.txt"');
+  o.filterLines.forEach((ln, i)=>{
+    B.push(`${i ? ">>" : ">"} "%FILTER%" echo ${batEsc(ln)}`);
+  });
+  B.push("");
+  B.push(`echo 書き出し中... ${o.info}`);
+  B.push("ffmpeg -y -hide_banner -stats -loglevel warning ^");
+  for(const n of o.inputs) B.push(`  -i "${batEsc(n)}" ^`);
+  B.push('  -filter_complex_script "%FILTER%" ^');
+  B.push('  -map "[outv]" -map "[outa]" %VARGS% -c:a aac -b:a 256k -movflags +faststart ^');
+  B.push(`  "${o.outName}"`);
+  B.push('set "ERR=%ERRORLEVEL%"');
+  B.push('del "%FILTER%" >nul 2>nul');
+  B.push('if not "%ERR%"=="0" (');
+  B.push("  echo.");
+  B.push("  echo [エラー] 書き出しに失敗しました。上のメッセージを確認してください。");
+  B.push(") else (");
+  B.push("  echo.");
+  B.push(`  echo 完了: ${batEsc(o.outName)}`);
+  B.push(")");
+  B.push("pause");
+  return B.join("\r\n") + "\r\n";
+}
+function buildFfmpegBat(){
+  if(!plan){ alert("先に「解析して音ハメ案を作成」を実行してください。"); return; }
+  if(!bgm){ alert("BGMを追加してください。"); return; }
+  const [W, H] = calcStageSize();
+  const byId = new Map(clips.map(c => [c.id, c]));
+  // 使用する素材ファイルを ffmpeg の入力番号に割り当て
+  const inputs = [], idxByFile = new Map();
+  for(const seg of plan.segs){
+    const c = byId.get(seg.cands[seg.pick].clipId);
+    if(c && !idxByFile.has(c.fileId)){
+      idxByFile.set(c.fileId, inputs.length);
+      inputs.push(c.name);
+    }
+  }
+  const bgmIdx = inputs.length;
+  inputs.push(bgm.name);
+  if(new Set(inputs).size !== inputs.length &&
+     !confirm("同じファイル名の素材が複数あります。同一フォルダでは区別できず、正しく書き出せない可能性があります。続行しますか？")) return;
+
+  const AF = "aformat=sample_rates=48000:channel_layouts=stereo";
+  const clipVol = (settings.clipVol / 100).toFixed(3);
+  const bgmVol = (settings.bgmVol / 100).toFixed(3);
+  const segs = plan.segs.filter(s => byId.get(s.cands[s.pick].clipId));
+  const lines = [];
+  segs.forEach((seg, i)=>{
+    const ch = seg.cands[seg.pick];
+    const c = byId.get(ch.clipId);
+    const idx = idxByFile.get(c.fileId);
+    const srcDur = fmtT(seg.dur * ch.rate);
+    lines.push(`[${idx}:v]trim=start=${fmtT(ch.s)}:duration=${srcDur},setpts=(PTS-STARTPTS)/${ch.rate},fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,format=yuv420p[v${i}];`);
+    if(c.audioOn && c.env){
+      // atempo はピッチを保ったまま速度変更（ブラウザ版の preservesPitch と同等）
+      lines.push(`[${idx}:a]atrim=start=${fmtT(ch.s)}:duration=${srcDur},asetpts=PTS-STARTPTS,atempo=${ch.rate},${AF},volume=${clipVol},apad,atrim=duration=${fmtT(seg.dur)}[a${i}];`);
+    }else{
+      lines.push(`anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${fmtT(seg.dur)}[a${i}];`);
+    }
+  });
+  lines.push(segs.map((s, i)=>`[v${i}][a${i}]`).join("") + `concat=n=${segs.length}:v=1:a=1[outv][ca];`);
+  const fade = Math.min(1.2, bgm.effDur * 0.2);
+  lines.push(`[${bgmIdx}:a]atrim=duration=${fmtT(bgm.effDur)},asetpts=PTS-STARTPTS,${AF},volume=${bgmVol},afade=t=out:st=${fmtT(Math.max(0, bgm.effDur - fade))}:d=${fmtT(fade)}[ab];`);
+  lines.push("[ca][ab]amix=inputs=2:duration=first:normalize=0[outa]");
+
+  const st = stamp();
+  const outName = `otohame-vlog_${st}.mp4`;
+  downloadBat(buildBatText({
+    title: "音ハメVLOG ffmpeg書き出し",
+    inputs, filterLines: lines, outName,
+    info: `${segs.length}カット / 完成尺 ${bgm.effDur.toFixed(1)}秒 / ${W}x${H}`
+  }), `otohame-ffmpeg_${st}.bat`);
+}
+
 /* ================= イベント ================= */
 $("dropzone").addEventListener("click", ()=>$("fileInput").click());
 $("fileInput").addEventListener("change", e=>{ addFiles([...e.target.files]); e.target.value = ""; });
@@ -1072,6 +1210,7 @@ $("clipVol").addEventListener("input", e=>{
 $("analyzeBtn").addEventListener("click", analyze);
 $("previewBtn").addEventListener("click", ()=>runSequence(false));
 $("exportBtn").addEventListener("click", ()=>runSequence(true));
+$("ffmpegBtn").addEventListener("click", buildFfmpegBat);
 $("stopBtn").addEventListener("click", ()=>{ abortFlag = true; });
 
 /* ================= 復元 ================= */

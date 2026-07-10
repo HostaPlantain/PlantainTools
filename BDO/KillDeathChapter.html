@@ -67,6 +67,7 @@ kbd{background:#2e3648;border:1px solid var(--line);border-radius:3px;padding:0 
 <body>
 <header>
   <h1>BDO Kill/Death Chapter Marker <span style="color:var(--acc)">v1.03</span></h1>
+  <span style="color:var(--dim);font-size:12px">録画からキルとデスを検出、全キルシーンの動画を切り出せるツール</span>
 </header>
 <main>
   <section id="left">
@@ -163,7 +164,7 @@ kbd{background:#2e3648;border:1px solid var(--line);border-radius:3px;padding:0 
         <button class="primary" id="btnBat">⬇ 無劣化切り出し (.bat生成)</button>
         <button id="btnCmdCopy" title="ffmpegコマンドをクリップボードにコピー">📋 コマンドをコピー</button>
       </div>
-      <div class="hint">無劣化・高速切り出しはffmpegコマンドを生成します。<br><b>ffmpegインストール済みのPC</b>で、生成した.batを<b>動画と同じフォルダ</b>に置いて実行してください。<br>キーフレーム単位で切るため開始位置は指定より最大1〜2秒早くなります。<br>範囲が重なるキルは1本にまとめます。</div>
+      <div class="hint">無劣化・高速切り出しはffmpegコマンドを生成します。<br><b>ffmpegインストール済みのPC</b>で、生成した.batを<b>動画と同じフォルダ</b>に置いて実行してください。<br>キーフレーム単位で切るため開始位置は指定より最大1〜2秒早くなります(前が余分に入るだけ)。<br>範囲が重なるキルは1本にまとめます。</div>
       <div class="row">
         <button id="btnClips">🎥 ブラウザで書き出し (webm/再エンコード)</button>
         <button id="btnClipCancel" disabled>中止</button>

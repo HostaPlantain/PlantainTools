@@ -4,15 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>1秒VLOGメーカー</title>
+<link rel="stylesheet" href="../Style/common.css">
 <style>
-  :root{
-    --bg:#0f1117; --panel:#1a1e2a; --panel2:#232838; --text:#e8eaf0;
-    --sub:#8b93a7; --accent:#ff5c7a; --accent2:#5cc8ff; --ok:#4ade80;
-    --border:#2e3448; --radius:14px;
-  }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
-    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP",sans-serif;
+    font-family:var(--pt-font);
     background:var(--bg); color:var(--text); min-height:100vh; padding:24px 16px 80px;
   }
   .wrap{max-width:980px; margin:0 auto;}
@@ -33,7 +29,7 @@
     text-align:center; color:var(--sub); cursor:pointer; transition:.15s;
     font-size:14px;
   }
-  .dropzone:hover,.dropzone.over{border-color:var(--accent2); color:var(--accent2); background:rgba(92,200,255,.05);}
+  .dropzone:hover,.dropzone.over{border-color:var(--accent2); color:var(--accent2); background:rgba(124,107,176,.08);}
   .clips{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; margin-top:14px;}
   .clip{
     background:var(--panel2); border:1px solid var(--border); border-radius:10px;
@@ -118,7 +114,7 @@
   <!-- クリップ -->
   <section>
     <h2>🎬 クリップ <span class="badge" id="clipCount">0本</span></h2>
-    <div class="dropzone" id="dropzone">動画ファイルをドロップ / クリックで選択（複数可）</div>
+    <div class="dropzone" id="dropzone">動画ファイルをドロップ / クリックで選択(複数可)</div>
     <input type="file" id="fileInput" accept="video/*" multiple>
     <div class="clips" id="clipList"></div>
     <div class="row" id="clipActions" style="margin-top:10px; display:none">
@@ -134,7 +130,7 @@
     <h2>🎵 BGM</h2>
     <div class="row" style="margin-bottom:12px">
       <label class="lbl"><input type="radio" name="bgmMode" value="file" checked> 音楽ファイル</label>
-      <label class="lbl"><input type="radio" name="bgmMode" value="manual"> テンポ手動指定（書き出しは無音）</label>
+      <label class="lbl"><input type="radio" name="bgmMode" value="manual"> テンポ手動指定(書き出しは無音)</label>
     </div>
     <div id="bgmFilePane">
       <div class="dropzone" id="bgmDrop">音楽ファイルをドロップ / クリックで選択</div>
@@ -155,13 +151,13 @@
         <span class="lbl" id="tapInfo"></span>
       </div>
       <p class="hint">使いたい曲を別で再生しながらリズムに合わせてタップするか、BPMを直接入力してください。<br>
-      カット割りだけをそのテンポに同期し、書き出し動画のBGMは<b>無音</b>になります（音声ありのクリップの音は入ります）。<br>
+      カット割りだけをそのテンポに同期し、書き出し動画のBGMは<b>無音</b>になります(音声ありのクリップの音は入ります)。<br>
       投稿時にYouTube等の公式機能でBGMを追加する使い方を想定しています。</p>
     </div>
     <div class="bgm-info" style="display:flex; margin-top:12px">
       <label class="lbl">1クリップの拍数
         <select id="beatsSel">
-          <option value="auto">自動（約1秒）</option>
+          <option value="auto">自動(約1秒)</option>
           <option value="1">1拍</option>
           <option value="2">2拍</option>
           <option value="3">3拍</option>
@@ -201,11 +197,11 @@
       <video id="resultVideo" controls playsinline></video><br>
       <a class="dl" id="dlLink" download>⬇ ダウンロード</a>
     </div>
-    <p class="hint">「動画に書き出す」は実時間再生しながら録画します（完成尺と同じ時間がかかります）。<br>
+    <p class="hint">「動画に書き出す」は実時間再生しながら録画します(完成尺と同じ時間がかかります)。<br>
     書き出し中はタブを閉じたり切り替えたりしないでください。<br>
     「<b>⚡ ffmpegで高速書き出し</b>」は編集内容を .bat ファイルに変換してダウンロードします。<br>
-    <b>素材の動画・BGMファイルと同じフォルダ</b>に置いてダブルクリックすると、ffmpeg が実時間を待たずに高画質（libx264 CRF17 / NVIDIA GPUがあれば自動でNVENC）で書き出します。<br>
-    ffmpeg 4.4以降のインストールが必要です（例: winget install Gyan.FFmpeg）。</p>
+    <b>素材の動画・BGMファイルと同じフォルダ</b>に置いてダブルクリックすると、ffmpeg が実時間を待たずに高画質(libx264 CRF17 / NVIDIA GPUがあれば自動でNVENC)で書き出します。<br>
+    ffmpeg 4.4以降のインストールが必要です(例: winget install Gyan.FFmpeg)。</p>
   </section>
 </div>
 
@@ -301,7 +297,7 @@ function refreshStats(){
   $("segLenLabel").textContent = s.toFixed(2);
   const total = clips.reduce((a,c)=>a + clipLen(c), 0);
   $("stats").innerHTML = clips.length
-    ? `クリップ <b>${clips.length}</b> 本（基本 <b>${s.toFixed(2)}</b> 秒/本）= 完成尺 <b>${total.toFixed(1)}</b> 秒`
+    ? `クリップ <b>${clips.length}</b> 本(基本 <b>${s.toFixed(2)}</b> 秒/本)= 完成尺 <b>${total.toFixed(1)}</b> 秒`
     : "クリップを追加してください。";
   $("clipCount").textContent = clips.length + "本";
   $("clipActions").style.display = clips.length ? "" : "none";
@@ -336,7 +332,7 @@ async function addFiles(files){
     };
     clips.push(clip);
     await prepareClip(clip);
-    // 録画開始直後の手ブレを避けるため、初期位置は1秒（尺が足りなければ調整）
+    // 録画開始直後の手ブレを避けるため、初期位置は1秒(尺が足りなければ調整)
     clip.start = Math.min(1, Math.max(0, clip.duration - segLen()));
     await saveClip(clip);
     renderClips();
@@ -474,11 +470,11 @@ function renderClips(){
         </div>
         <div class="ctrlrow">
           <button class="aud" title="この動画の音声を出力に含めるか"></button>
-          <select class="mult" title="このクリップに割り当てる尺（基本長×倍率）"></select>
+          <select class="mult" title="このクリップに割り当てる尺(基本長×倍率)"></select>
         </div>
         <div class="ctrlrow">
-          <select class="split cbtn" title="スライダーの範囲を等分して別クリップのように扱います（ファイルは分割されません）"></select>
-          <button class="dup cbtn" title="このクリップを複製（同じファイルから別のシーンを使えます）">⧉ 複製</button>
+          <select class="split cbtn" title="スライダーの範囲を等分して別クリップのように扱います(ファイルは分割されません)"></select>
+          <button class="dup cbtn" title="このクリップを複製(同じファイルから別のシーンを使えます)">⧉ 複製</button>
         </div>
       </div>`;
     const img = card.querySelector("img");
@@ -553,7 +549,7 @@ function renderClips(){
     });
     card.querySelector(".dup").addEventListener("click", ()=>duplicateClip(clip));
 
-    // ドラッグ並べ替え（サムネ部分のみ持てる）
+    // ドラッグ並べ替え(サムネイル部分のみ持てる)
     const thumbwrap = card.querySelector(".thumbwrap");
     thumbwrap.addEventListener("dragstart", ()=>{
       card.classList.add("dragging");
@@ -577,7 +573,7 @@ function renderClips(){
     list.appendChild(card);
   });
   if(!clips.length){
-    list.innerHTML = `<p class="empty" style="grid-column:1/-1">まだクリップがありません</p>`;
+    list.innerHTML = `<p class="empty" style="grid-column:1/-1">まだクリップがありません。</p>`;
   }
 }
 let dragSrc = null;
@@ -620,10 +616,10 @@ function detectBeats(buffer){
     for(let j=0; j<hop; j++){ const x = data[base+j]; s += x*x; }
     energy[i] = s;
   }
-  // オンセット（増分）
+  // オンセット(増分)
   const flux = new Float32Array(n);
   for(let i=1; i<n; i++) flux[i] = Math.max(0, energy[i] - energy[i-1]);
-  // 自己相関でテンポ推定（60〜180 BPM）
+  // 自己相関でテンポ推定(60〜180 BPM)
   const minLag = Math.round(fps * 60 / 180);
   const maxLag = Math.round(fps * 60 / 60);
   let bestLag = Math.round(fps * 0.5), best = -1;
@@ -709,7 +705,7 @@ async function runSequence(record){
     recorder.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
   }
 
-  // クリップ音声の配線（各クリップの音声トグルは muted で制御）
+  // クリップ音声の配線(各クリップの音声トグルは muted で制御)
   const clipGain = actx.createGain();
   clipGain.gain.value = 1;
   clipGain.connect(master);
@@ -723,7 +719,7 @@ async function runSequence(record){
     }
   }
 
-  // BGM（テンポ手動指定モードでは無音）
+  // BGM(テンポ手動指定モードでは無音)
   const useBgm = settings.bgmMode !== "manual" && bgm && bgm.buffer;
   let bgmSrc = null;
   if(useBgm){
@@ -738,7 +734,7 @@ async function runSequence(record){
     bgmSrc._fadeLen = fade;
   }
 
-  // 事前シーク（先頭クリップ）
+  // 事前シーク(先頭クリップ)
   await seekTo(clips[0].video, clips[0].start);
 
   try{
@@ -890,7 +886,7 @@ function buildBatText(o){
   B.push("pause");
   return B.join("\r\n") + "\r\n";
 }
-// 音声トラックの有無を事前チェック（音声のないファイルを [n:a] で参照すると ffmpeg がエラーになるため）
+// 音声トラックの有無を事前チェック(音声のないファイルを [n:a] で参照すると ffmpeg がエラーになるため)
 const audioProbe = {};
 async function fileHasAudio(clip){
   if(audioProbe[clip.fileId] === undefined){
@@ -915,7 +911,7 @@ async function buildFfmpegBat(){
   try{
     const [W, H] = calcStageSize();
     const useBgm = settings.bgmMode !== "manual" && bgm && bgm.blob;
-    // 実ファイル名を files ストアから取得（分割クリップは表示名が「name (1/3)」等に変わっているため）
+    // 実ファイル名を files ストアから取得(分割クリップは表示名が「name (1/3)」等に変わっているため)
     const inputs = [], idxByFile = new Map();
     for(const c of clips){
       if(idxByFile.has(c.fileId)) continue;
@@ -938,7 +934,7 @@ async function buildFfmpegBat(){
       const idx = idxByFile.get(c.fileId);
       const dur = fmtT(lens[i]);
       let vchain = `[${idx}:v]trim=start=${fmtT(c.start)}:duration=${dur},setpts=PTS-STARTPTS,fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,format=yuv420p`;
-      // 素材の残り尺が足りない場合は最終フレームを止めて埋める（ブラウザ版と同じ挙動）
+      // 素材の残り尺が足りない場合は最終フレームを止めて埋める(ブラウザ版と同じ挙動)
       const shortBy = lens[i] - Math.max(0, (c.duration || 0) - c.start);
       if(shortBy > 0.02) vchain += `,tpad=stop_mode=clone:stop_duration=${fmtT(shortBy + 0.1)},trim=duration=${dur}`;
       lines.push(vchain + `[v${i}];`);
@@ -1050,7 +1046,7 @@ $("tapBtn").addEventListener("click", ()=>{
     saveManualBpm();
     refreshStats();
   }else{
-    $("tapInfo").textContent = `${taps.length}回…（4回以上で確定）`;
+    $("tapInfo").textContent = `${taps.length}回…(4回以上で確定)`;
   }
 });
 $("beatsSel").addEventListener("change", e=>{
@@ -1101,7 +1097,7 @@ $("stopBtn").addEventListener("click", ()=>{ abortFlag = true; });
     for(const r of rows){
       let blob = r.blob, fileId = r.fileId, migrated = false;
       if(blob && !fileId){
-        // 旧形式（blob直持ち）→ files ストアへ移行
+        // 旧形式(blob直持ち)→ files ストアへ移行
         fileId = newId();
         await idbPut("files", {id: fileId, blob, name: r.name});
         migrated = true;

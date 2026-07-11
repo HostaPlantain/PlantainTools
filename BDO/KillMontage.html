@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BDO Kill Montage Maker v2</title>
+<title>BDO Kill Montage Maker</title>
 <link rel="stylesheet" href="../Style/common.css">
 <style>
 *{box-sizing:border-box}
@@ -51,6 +51,8 @@ select,input[type=text],input[type=number]{font-size:13px;background:var(--pt-fi
 .clip .w{color:var(--warn)}
 .clip .r{font-family:var(--pt-mono);color:var(--dim);font-size:11px}
 .clip button{padding:1px 6px;font-size:11px}
+.clip input.ext{width:40px;padding:1px 3px;font-size:11px}
+.clip .exl{color:var(--dim);font-size:10px;flex-shrink:0}
 .badge{display:inline-block;padding:0 5px;border-radius:4px;font-size:11px;font-weight:600;background:rgba(255,107,129,.18);color:var(--kill)}
 .sw{display:inline-block;width:10px;height:10px;border-radius:2px;flex-shrink:0}
 kbd{background:var(--pt-btn);border:1px solid var(--line);border-radius:3px;padding:0 4px;font-size:11px}
@@ -59,7 +61,7 @@ progress{width:100%;height:8px}
 </head>
 <body>
 <header>
-  <h1>BDO Kill Montage Maker <span style="color:var(--acc)">v2.2</span></h1>
+  <h1>BDO Kill Montage Maker <span style="color:var(--acc)">v2.3</span></h1>
   <span style="color:var(--dim);font-size:12px">連続キル統合 + 可変シーン長/速度で全キルをビートに同期</span>
 </header>
 <main>
@@ -106,7 +108,7 @@ progress{width:100%;height:8px}
         <label class="sl" style="flex:1;margin:0">表示 <input type="range" id="waveScroll" min="0" max="0" step="0.1" value="0"></label>
         <select id="waveZoom"><option value="8">8秒</option><option value="16" selected>16秒</option><option value="40">40秒</option></select>
       </div>
-      <label class="sl">BPM <input type="range" id="bpm" min="60" max="200" step="0.05" value="120"><span class="val" id="bpmV">120.00</span></label>
+      <label class="sl">BPM <input type="range" id="bpm" min="60" max="300" step="0.05" value="120"><span class="val" id="bpmV">120.00</span></label>
       <label class="sl">拍オフセット <input type="range" id="off" min="0" max="2" step="0.005" value="0"><span class="val" id="offV">0.000</span></label>
       <div class="row">
         <button id="btnReDetect" disabled>再検出</button>
@@ -129,12 +131,15 @@ progress{width:100%;height:8px}
       <div class="row">
         <span class="hint" style="margin:0">シーン長:</span>
         <select id="lenMode">
-          <option value="auto" selected>自動 (連続キルに合わせ伸縮)</option>
+          <option value="auto" selected>自動 (基準長の倍数で伸縮)</option>
           <option value="fixed">一定</option>
         </select>
-        <select id="clipBeats" title="シーン長が「一定」のときの長さ">
+        <select id="clipBeats" title="基準のシーン長。「自動」では連続キルに合わせこの倍数に伸縮、「一定」では常にこの長さ">
+          <option value="3">3拍</option>
           <option value="4">4拍</option>
+          <option value="6">6拍</option>
           <option value="8" selected>8拍</option>
+          <option value="12">12拍</option>
           <option value="16">16拍</option>
         </select>
       </div>
@@ -148,10 +153,11 @@ progress{width:100%;height:8px}
         <select id="tailBeats">
           <option value="1">1拍</option>
           <option value="2">2拍</option>
+          <option value="3">3拍</option>
           <option value="4" selected>4拍</option>
         </select>
       </div>
-      <div class="hint">カットは必ず拍、シーン最後のキルは<b>小節頭(最強拍)</b>に着地します。シーン長・速度とも「自動」にすると、連続キルの途中のキルも再生速度の微調整(0.8〜1.3x)で拍に着地し、最もリズミカルな音ハメになります。</div>
+      <div class="hint">カットは必ず拍に着地します。シーン長「自動」は<b>指定した基準長の倍数</b>で伸縮し、シーン最後のキルは常に同じグリッド位置(基準長−余韻)に着地します。シーン長・速度とも「自動」にすると、連続キルの途中のキルも再生速度の微調整(0.8〜1.3x)で拍に着地し、最もリズミカルな音ハメになります。</div>
       <div class="status" id="modeHint"></div>
       <div class="row">
         <span class="hint" style="margin:0">出力:</span>
@@ -172,7 +178,7 @@ progress{width:100%;height:8px}
         <button id="btnSortOrig">元の順に戻す</button>
       </div>
       <div id="clipList"></div>
-      <div class="hint">✔で採用/除外、↑↓で並べ替え。行クリックでその位置からプレビュー。「n連」=統合された連続キル、♪=拍に着地するキル数、×n.nn=再生速度。⚠は素材不足です。</div>
+      <div class="hint">✔で採用/除外、↑↓で並べ替え。行クリックでその位置からプレビュー。「n連」=統合された連続キル、♪=拍に着地するキル数、×n.nn=再生速度。⚠は素材不足です。前/後=そのシーンを前(キル前)/後(余韻後)方向へ延長する拍数 (負で短縮)。</div>
     </div>
 
     <div class="card">
@@ -301,14 +307,14 @@ function rebuildScenes(){
     let cur=null;
     for(const t of v.kills){
       if(cur&&t-cur.kills[cur.kills.length-1]<=gap) cur.kills.push(t);
-      else{ cur={vi,kills:[t],on:true}; fresh.push(cur); }
+      else{ cur={vi,kills:[t],on:true,pre:0,post:0}; fresh.push(cur); }
     }
   });
   // 既存の採用状態・並び順をできるだけ維持 (先頭キル時刻で対応付け)
   const out=[];
   for(const old of M.scenes){
     const m=fresh.find(f=>!out.includes(f)&&f.vi===old.vi&&f.kills.includes(old.kills[0]));
-    if(m){ m.on=old.on&&m.on; out.push(m); }
+    if(m){ m.on=old.on&&m.on; m.pre=old.pre||0; m.post=old.post||0; out.push(m); }
   }
   for(const f of fresh) if(!out.includes(f)) out.push(f);
   M.scenes=out;
@@ -414,7 +420,7 @@ $("bpm").oninput=()=>setBeat(+$("bpm").value,M.beat.offset);
 $("off").oninput=()=>{ M.beat.offset=+$("off").value; $("offV").textContent=M.beat.offset.toFixed(3); refresh(); saveSoon(); };
 $("btnReDetect").onclick=()=>detect();
 $("btnHalf").onclick=()=>setBeat(Math.max(60,M.beat.bpm/2),M.beat.offset);
-$("btnDouble").onclick=()=>setBeat(Math.min(200,M.beat.bpm*2),M.beat.offset);
+$("btnDouble").onclick=()=>setBeat(Math.min(300,M.beat.bpm*2),M.beat.offset);
 $("btnShiftBeat").onclick=()=>setBeat(M.beat.bpm,M.beat.offset+60/M.beat.bpm);
 
 /* ---- waveform ---- */
@@ -542,10 +548,12 @@ function computeSegments(){
   for(let i=0;i<list.length;i++){
     const sc=list[i], v=M.videos[sc.vi];
     const ks=sc.kills, kn=ks[ks.length-1], span=kn-ks[0];
+    const pre=Math.round(sc.pre||0), post=Math.round(sc.post||0);
     let r=1, killLocal, sceneBeats;
     const warn=[];
     if(s.lenMode==="fixed"){
-      killLocal=Math.max(1,s.clipBeats-tail); sceneBeats=s.clipBeats;
+      killLocal=Math.max(1,Math.max(1,s.clipBeats-tail)+pre);
+      sceneBeats=Math.max(killLocal,s.clipBeats+pre+post);
       if(s.spdMode==="auto"){
         const br=bestRate(ks,beat,killLocal-1);
         if(br==null){ r=1.3; warn.push("連続キルが収まりません(シーン長を自動に)"); }
@@ -553,10 +561,13 @@ function computeSegments(){
       }else if(span/beat>killLocal-0.5) warn.push("連続キルが収まりません(自動速度/自動シーン長を推奨)");
     }else{
       if(s.spdMode==="auto") r=bestRate(ks,beat,null)||1;
+      const q=Math.max(1,s.clipBeats);                  // 基準シーン長
       const need=1+span/(r*beat);                       // 先頭キル前に最低1拍のリード
-      const g=Math.max(4,Math.ceil((bIdx+need)/4)*4);   // 最後のキル=小節頭(4拍単位)
-      killLocal=g-bIdx; sceneBeats=killLocal+tail;
+      const base=q*Math.max(1,Math.ceil((need+tail)/q)); // 基準長の倍数へ伸縮
+      killLocal=Math.max(1,base-tail+pre);
+      sceneBeats=Math.max(killLocal,base+pre+post);
       if(sceneBeats>64) warn.push("シーンが長すぎます(統合間隔を短くしてください)");
+      if(pre&&((pre%q)+q)%q!==0) warn.push("前延長"+pre+"拍でキルの着地がグリッドからずれます("+q+"拍単位なら維持)");
     }
     const start=i===0?0:grid+bIdx*beat;
     const end=grid+(bIdx+sceneBeats)*beat;
@@ -615,8 +626,14 @@ function renderScenes(){
       ${seg&&nk>1?`<span class="r" title="拍に着地するキル数">♪${seg.onBeat}/${nk}</span>`:""}
       ${seg&&Math.abs(seg.r-1)>0.001?`<span class="r">×${seg.r.toFixed(2)}</span>`:""}
       ${seg&&seg.warn.length?`<span class="w" title="${seg.warn.join(" / ")}">⚠</span>`:""}
+      <span class="exl">前</span><input type="number" class="ext" data-e="pre" step="1" value="${c.pre||0}" title="シーンを前方向(キル前)に延長する拍数 (負で短縮)">
+      <span class="exl">後</span><input type="number" class="ext" data-e="post" step="1" value="${c.post||0}" title="シーンを後方向(余韻の後)に延長する拍数 (負で短縮)">
       <button data-a="up" title="上へ">↑</button><button data-a="dn" title="下へ">↓</button>`;
-    d.querySelector("input").onclick=e=>{ e.stopPropagation(); c.on=e.target.checked; refresh(); };
+    d.querySelector('input[type=checkbox]').onclick=e=>{ e.stopPropagation(); c.on=e.target.checked; refresh(); };
+    d.querySelectorAll("input.ext").forEach(inp=>{
+      inp.onclick=e=>e.stopPropagation();
+      inp.onchange=e=>{ e.stopPropagation(); c[inp.dataset.e]=Math.round(+inp.value)||0; refresh(); };
+    });
     d.querySelectorAll("button").forEach(b=>b.onclick=e=>{
       e.stopPropagation();
       const j=b.dataset.a==="up"?i-1:i+1;

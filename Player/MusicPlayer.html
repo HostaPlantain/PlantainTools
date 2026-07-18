@@ -117,6 +117,24 @@
     background:var(--pt-canvas); border-radius:10px;
   }
 
+  /* ===== 歌詞 ===== */
+  .lyrics{
+    max-height:280px; overflow-y:auto; text-align:center;
+    padding:14px 8px; scroll-behavior:smooth;
+    background:var(--pt-card); border-radius:10px;
+  }
+  .lyrics p{
+    padding:5px 8px; font-size:15px; line-height:1.7; color:var(--sub);
+    border-radius:8px; transition:color .2s, transform .25s, background .2s;
+    min-height:1.2em;
+  }
+  .lyrics p.seekable{cursor:pointer;}
+  .lyrics p.seekable:hover{background:var(--pt-hover); color:var(--text);}
+  .lyrics p.cur{
+    color:var(--accent); font-weight:bold; transform:scale(1.05);
+    background:var(--pt-hover);
+  }
+
   /* ===== プレイリスト ===== */
   .listhead{display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
   .listhead h2{font-size:15px; display:flex; align-items:center; gap:8px;}
@@ -182,7 +200,7 @@
 <body>
 <div class="wrap">
   <h1>Plantain Player<span class="dot">.</span></h1>
-  <div class="tagline">../Songs フォルダの楽曲を再生するミュージックプレイヤー</div>
+  <div class="tagline">AI 楽曲を再生するミュージックプレイヤー</div>
 
   <section>
     <div class="player">
@@ -217,17 +235,21 @@
     <canvas class="vis" id="vis"></canvas>
   </section>
 
+  <section id="lyrSec" style="display:none">
+    <div class="listhead" style="margin-bottom:10px">
+      <h2>歌詞 <span class="badge" id="lyrBadge"></span></h2>
+    </div>
+    <div class="lyrics" id="lyrBox"></div>
+  </section>
+
   <section>
     <div class="listhead">
       <h2>プレイリスト <span class="badge" id="count">0曲</span></h2>
       <input type="search" id="filter" placeholder="曲名で絞り込み">
-      <button id="btnReload">🔄 更新</button>
     </div>
     <ul class="songs" id="songList"></ul>
     <div class="status" id="status"></div>
     <div class="hint">
-      曲を追加したら mp3/wav 等を <b>Songs</b> フォルダに入れ、<b>Songs/songs.json</b> にファイル名を追記して「🔄 更新」。
-      (ディレクトリ一覧を返すローカルサーバー経由なら songs.json なしでも自動検出)<br>
       <kbd>Space</kbd> 再生/停止 · <kbd>←</kbd><kbd>→</kbd> ±5秒 · <kbd>↑</kbd><kbd>↓</kbd> 音量 · <kbd>N</kbd>/<kbd>P</kbd> 次/前の曲
     </div>
   </section>
@@ -338,6 +360,7 @@ function play(i){
   localStorage.setItem(LS+"last",n);
   updateMediaSession(n);
   updateActive();
+  loadLyrics(n);
 }
 function next(auto){
   if(!songs.length) return;
@@ -384,6 +407,7 @@ audio.ontimeupdate=()=>{
   setRangeFill($("seek"),pct);
   $("tCur").textContent=fmt(t);
   $("tDur").textContent=fmt(d);
+  updateLyric(t);
 };
 audio.onerror=()=>{ if(cur>=0) setStatus("読み込みエラー: "+songs[cur],"warn"); };
 
@@ -439,8 +463,76 @@ $("volIcon").onclick=()=>{
   else setVol(lastVol||80);
 };
 
-$("btnReload").onclick=listSongs;
 $("filter").oninput=renderList;
+
+/* ---------- 歌詞 ---------- */
+let lyr={lines:null,timed:false,el:[],cur:-1};
+function numOr(v){ const n=+v; return (v==null||v===""||isNaN(n))?null:n; }
+function parseTextLyrics(s){
+  const lrc=/^\s*\[(\d+):(\d+(?:\.\d+)?)\]\s*/;
+  return s.split(/\r?\n/).map(row=>{
+    let t=null,txt=row;
+    const m=row.match(lrc);
+    if(m){ t=(+m[1])*60+ +m[2]; txt=row.replace(lrc,""); }
+    return {text:txt.trim(),start:t,end:null};
+  });
+}
+function normLyrics(d){
+  if(typeof d==="string") return parseTextLyrics(d);
+  if(Array.isArray(d)){
+    if(d.every(x=>typeof x==="string")) return d.map(s=>({text:s.trim(),start:null,end:null}));
+    return d.filter(x=>x&&typeof x.text==="string")
+            .map(x=>({text:x.text.trim(),start:numOr(x.start??x.t??x.time),end:numOr(x.end)}));
+  }
+  if(d&&typeof d==="object"){
+    if(Array.isArray(d.lines)) return normLyrics(d.lines);   // lyric-subtitler プロジェクトJSON
+    if(typeof d.lyrics==="string") return parseTextLyrics(d.lyrics);
+  }
+  return null;
+}
+async function loadLyrics(n){
+  const sec=$("lyrSec"), box=$("lyrBox");
+  lyr={lines:null,timed:false,el:[],cur:-1};
+  sec.style.display="none"; box.innerHTML="";
+  try{
+    const res=await fetch(SONGS_DIR+encodeURIComponent(baseName(n)+".json"),{cache:"no-store"});
+    if(!res.ok) return;
+    let lines=normLyrics(await res.json());
+    if(!lines) return;
+    // 前後の空行を除去 (中間の空行は間隔として残す)
+    while(lines.length&&!lines[0].text) lines.shift();
+    while(lines.length&&!lines[lines.length-1].text) lines.pop();
+    if(!lines.length) return;
+    lyr.lines=lines;
+    lyr.timed=lines.some(l=>l.start!=null);
+    for(const l of lines){
+      const p=document.createElement("p");
+      p.textContent=l.text||" ";
+      if(lyr.timed&&l.start!=null){
+        p.classList.add("seekable");
+        p.onclick=()=>{ audio.currentTime=l.start; audio.play(); };
+      }
+      box.appendChild(p);
+    }
+    lyr.el=[...box.children];
+    $("lyrBadge").textContent=lyr.timed?"同期":"テキスト";
+    sec.style.display="";
+  }catch(e){}
+}
+function updateLyric(t){
+  if(!lyr.timed) return;
+  const L=lyr.lines;
+  let idx=-1;
+  for(let i=0;i<L.length;i++) if(L[i].start!=null&&t>=L[i].start-0.05) idx=i;
+  if(idx===lyr.cur) return;
+  if(lyr.cur>=0) lyr.el[lyr.cur].classList.remove("cur");
+  lyr.cur=idx;
+  if(idx>=0){
+    const p=lyr.el[idx], box=$("lyrBox");
+    p.classList.add("cur");
+    box.scrollTo({top:p.offsetTop-box.offsetTop-box.clientHeight/2+p.offsetHeight/2,behavior:"smooth"});
+  }
+}
 
 document.addEventListener("keydown",e=>{
   if(e.target.matches("input,select,textarea")) return;
@@ -521,6 +613,7 @@ listSongs().then(()=>{
     $("subtitle").textContent=n;
     $("discLabel").style.background=gradOf(n);
     updateActive();
+    loadLyrics(n);
   }
 });
 drawVis();

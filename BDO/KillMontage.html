@@ -62,7 +62,7 @@ progress{width:100%;height:8px}
 </head>
 <body>
 <header>
-  <h1>BDO Kill Montage Maker <span style="color:var(--acc)">v4.1</span></h1>
+  <h1>BDO Kill Montage Maker <span style="color:var(--acc)">v4.2</span></h1>
   <span style="color:var(--dim);font-size:12px">連続キル統合 + 可変シーン長/速度で全キルをビートに同期 (BGMなし出力対応 / Songsフォルダ連携)</span>
 </header>
 <main>
@@ -185,7 +185,7 @@ progress{width:100%;height:8px}
         <button id="btnSortOrig">元の順に戻す</button>
       </div>
       <div id="clipList"></div>
-      <div class="hint">✔で採用/除外、↑↓で並べ替え。行クリックでその位置からプレビュー。「n連」=統合された連続キル、♪=拍に着地するキル数、×n.nn=再生速度。⚠は素材不足です。前/後=そのシーンを前(キル前)/後(余韻後)方向へ延長する拍数 (負で短縮)。</div>
+      <div class="hint">✔で採用/除外、↑↓で並べ替え。行クリックでその位置からプレビュー。「n連」=統合された連続キル、♪=拍に着地するキル数、×n.nn=再生速度。⚠は素材不足です。前/後=そのシーンを前(キル前)/後(余韻後)方向へ延長する拍数 (負で短縮)。負値は手動指定を優先し、キルの瞬間より内側まで短縮できます (⚠で通知)。延長により隣のシーン(同じ動画)と素材が重なった場合は自動的に1シーンへ統合し、速度を再計算します。</div>
     </div>
 
     <div class="card">
@@ -617,18 +617,16 @@ function bestRate(kills,beat,maxSpanBeats){
 function computeSegments(){
   const s=settings(), b=M.beat, beat=60/b.bpm, tail=s.tailBeats, grid=b.offset;
   const list=M.scenes.filter(c=>c.on&&M.videos[c.vi]&&M.videos[c.vi].ready);
-  const segs=[]; let bIdx=0;
-  for(let i=0;i<list.length;i++){
-    const sc=list[i], v=M.videos[sc.vi];
-    const ks=sc.kills, kn=ks[ks.length-1], span=kn-ks[0];
-    const pre=Math.round(sc.pre||0), post=Math.round(sc.post||0);
+  /* シーン単体のパラメータ計算。負の前/後は手動指定を優先し、キルの瞬間より内側まで短縮できる */
+  function calc(ks,pre,post){
+    const kn=ks[ks.length-1], span=kn-ks[0];
     let r=1, killLocal, sceneBeats;
     const warn=[];
     if(s.lenMode==="fixed"){
-      killLocal=Math.max(1,Math.max(1,s.clipBeats-tail)+pre);
-      sceneBeats=Math.max(killLocal,s.clipBeats+pre+post);
+      killLocal=Math.max(1,s.clipBeats-tail)+pre;
+      sceneBeats=Math.max(1,s.clipBeats+pre+post);
       if(s.spdMode==="auto"){
-        const br=bestRate(ks,beat,killLocal-1);
+        const br=bestRate(ks,beat,Math.max(1,killLocal)-1);
         if(br==null){ r=1.3; warn.push("連続キルが収まりません(シーン長を自動に)"); }
         else r=br;
       }else if(span/beat>killLocal-0.5) warn.push("連続キルが収まりません(自動速度/自動シーン長を推奨)");
@@ -638,22 +636,52 @@ function computeSegments(){
       const lead=Math.max(1,q-tail);                    // 単発シーンと同じリード拍数を先頭キル前に確保
       const need=lead+span/(r*beat);
       const base=q*Math.max(1,Math.ceil((need+tail)/q)); // 基準長の倍数へ伸縮
-      killLocal=Math.max(1,base-tail+pre);
-      sceneBeats=Math.max(killLocal,base+pre+post);
+      killLocal=base-tail+pre;
+      sceneBeats=Math.max(1,base+pre+post);
       if(sceneBeats>64) warn.push("シーンが長すぎます(統合間隔を短くしてください)");
       if(pre&&((pre%q)+q)%q!==0) warn.push("前延長"+pre+"拍でキルの着地がグリッドからずれます("+q+"拍単位なら維持)");
     }
-    const start=i===0?0:grid+bIdx*beat;
-    const end=grid+(bIdx+sceneBeats)*beat;
-    const killMT=grid+(bIdx+killLocal)*beat;
-    const srcStart=kn-(killMT-start)*r;
-    if(srcStart<-0.05) warn.push("前"+(-srcStart).toFixed(1)+"s不足");
-    if(srcStart+(end-start)*r>v.duration+0.05) warn.push("後不足");
+    if(sceneBeats<killLocal) warn.push("後短縮によりキル着地が尺外です(手動指定)");
+    else if(killLocal<1) warn.push("前短縮によりキル前の間がほぼありません(手動指定)");
+    return {ks,kn,r,killLocal,sceneBeats,warn};
+  }
+  /* 単体計算 → 手動延長(後+ / 前+)で素材(元動画時間)が重なった隣接同一動画シーンを1つに統合 */
+  const prelim=list.map(sc=>({sc,p:calc(sc.kills,Math.round(sc.pre||0),Math.round(sc.post||0))}));
+  const groups=[];
+  for(const it of prelim){
+    const g=groups[groups.length-1];
+    let merged=false;
+    if(g){
+      const a=g[g.length-1];
+      if(a.sc.vi===it.sc.vi&&((a.sc.post||0)>0||(it.sc.pre||0)>0)){
+        const sA=a.p.kn-a.p.killLocal*beat*a.p.r, eA=a.p.kn+(a.p.sceneBeats-a.p.killLocal)*beat*a.p.r;
+        const sB=it.p.kn-it.p.killLocal*beat*it.p.r, eB=it.p.kn+(it.p.sceneBeats-it.p.killLocal)*beat*it.p.r;
+        if(Math.max(sA,sB)<Math.min(eA,eB)){ g.push(it); merged=true; }
+      }
+    }
+    if(!merged) groups.push([it]);
+  }
+  const segs=[]; let bIdx=0;
+  for(const g of groups){
+    const first=g[0].sc, v=M.videos[first.vi];
+    let p;
+    if(g.length===1) p=g[0].p;
+    else{
+      const ks=[...new Set(g.flatMap(x=>x.sc.kills))].sort((x,y)=>x-y);
+      p=calc(ks,Math.round(first.pre||0),Math.round(g[g.length-1].sc.post||0));
+    }
+    const start=segs.length===0?0:grid+bIdx*beat;
+    const end=grid+(bIdx+p.sceneBeats)*beat;
+    const killMT=grid+(bIdx+p.killLocal)*beat;
+    const srcStart=p.kn-(killMT-start)*p.r;
+    if(srcStart<-0.05) p.warn.push("前"+(-srcStart).toFixed(1)+"s不足");
+    if(srcStart+(end-start)*p.r>v.duration+0.05) p.warn.push("後不足");
     let onBeat=1;
-    for(let j=0;j<ks.length-1;j++) if(fracDist((kn-ks[j])/(r*beat))<0.15) onBeat++;
-    segs.push({scene:sc,vi:sc.vi,start,end,dur:end-start,srcStart:Math.max(0,srcStart),
-      killMT,r,kills:ks,nk:ks.length,onBeat,warn});
-    bIdx+=sceneBeats;
+    for(let j=0;j<p.ks.length-1;j++) if(fracDist((p.kn-p.ks[j])/(p.r*beat))<0.15) onBeat++;
+    segs.push({scene:first,mergedScenes:g.length>1?g.slice(1).map(x=>x.sc):null,
+      vi:first.vi,start,end,dur:end-start,srcStart:Math.max(0,srcStart),
+      killMT,r:p.r,kills:p.ks,nk:p.ks.length,onBeat,warn:p.warn});
+    bIdx+=p.sceneBeats;
   }
   M.segs=segs;
   M.total=segs.length?segs[segs.length-1].end:0;
@@ -688,7 +716,8 @@ function renderScenes(){
   $("clipCount").textContent=" (採用"+M.scenes.filter(c=>c.on).length+" / 全"+M.scenes.length+" ・ 完成尺 "+fmt(M.total)+")";
   M.scenes.forEach((c,i)=>{
     const v=M.videos[c.vi];
-    const seg=M.segs.find(s=>s.scene===c);
+    const seg=M.segs.find(s=>s.scene===c||(s.mergedScenes&&s.mergedScenes.includes(c)));
+    const child=!!(seg&&seg.scene!==c);   // 直前シーンに統合された側
     const d=document.createElement("div");
     d.className="clip"+(c.on?"":" off");
     const nk=c.kills.length;
@@ -696,10 +725,12 @@ function renderScenes(){
       <span class="sw" style="background:${PAL[c.vi%PAL.length]}"></span>
       <span class="t">${fmtMs(c.kills[0])}</span>
       ${nk>1?`<span class="badge">${nk}連</span>`:""}
+      ${child?`<span class="badge" title="延長により素材が重なるため直前のシーンに統合されています">⤴統合</span>`:""}
+      ${!child&&seg&&seg.mergedScenes?`<span class="badge" title="延長により素材が重なるため後続${seg.mergedScenes.length}シーンを統合し、速度を再計算しています">⛓${seg.mergedScenes.length+1}統合</span>`:""}
       <span class="nm">${v?v.name:"?"}</span>
-      ${seg&&nk>1?`<span class="r" title="拍に着地するキル数">♪${seg.onBeat}/${nk}</span>`:""}
-      ${seg&&Math.abs(seg.r-1)>0.001?`<span class="r">×${seg.r.toFixed(2)}</span>`:""}
-      ${seg&&seg.warn.length?`<span class="w" title="${seg.warn.join(" / ")}">⚠</span>`:""}
+      ${!child&&seg&&seg.nk>1?`<span class="r" title="拍に着地するキル数">♪${seg.onBeat}/${seg.nk}</span>`:""}
+      ${!child&&seg&&Math.abs(seg.r-1)>0.001?`<span class="r">×${seg.r.toFixed(2)}</span>`:""}
+      ${!child&&seg&&seg.warn.length?`<span class="w" title="${seg.warn.join(" / ")}">⚠</span>`:""}
       <span class="exl">前</span><input type="number" class="ext" data-e="pre" step="1" value="${c.pre||0}" title="シーンを前方向(キル前)に延長する拍数 (負で短縮)">
       <span class="exl">後</span><input type="number" class="ext" data-e="post" step="1" value="${c.post||0}" title="シーンを後方向(余韻の後)に延長する拍数 (負で短縮)">
       <button data-a="up" title="上へ">↑</button><button data-a="dn" title="下へ">↓</button>`;
@@ -740,6 +771,7 @@ function drawMtl(){
     const kn=s.kills[s.kills.length-1];
     for(const k of s.kills){
       const mt=s.killMT-(kn-k)/s.r;
+      if(mt<s.start-1e-6||mt>s.end+1e-6) continue;   // 手動短縮で尺外になったキルは非表示
       const last=k===kn;
       mctx.fillStyle=last?"#ff6b81":"rgba(255,107,129,.55)";
       mctx.beginPath(); mctx.moveTo(X(mt),12); mctx.lineTo(X(mt)-(last?4:3),4); mctx.lineTo(X(mt)+(last?4:3),4); mctx.fill();

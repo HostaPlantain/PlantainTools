@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plantain Player</title>
+<link rel="stylesheet" href="../Style/common.css">
+<style>
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:var(--pt-font); background:var(--bg); color:var(--text);
+    min-height:100vh; padding:24px 16px 80px;
+  }
+  .wrap{max-width:920px; margin:0 auto;}
+  h1{font-size:26px; letter-spacing:.02em;}
+  h1 .dot{color:var(--accent);}
+  .tagline{color:var(--sub); font-size:13px; margin-top:4px; margin-bottom:24px;}
+
+  section{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:18px; margin-bottom:18px;
+  }
+
+  /* ===== プレイヤー本体 ===== */
+  .player{display:flex; gap:26px; align-items:center; flex-wrap:wrap;}
+
+  /* 回転ディスク */
+  .discwrap{flex:0 0 auto; width:230px; height:230px; position:relative; margin:auto;}
+  .disc{
+    width:100%; height:100%; border-radius:50%;
+    background:
+      radial-gradient(circle at 50% 50%,
+        transparent 0 26%,
+        rgba(0,0,0,.82) 26.5% 34%,
+        rgba(20,18,28,.9) 34% 96%,
+        transparent 96.5%),
+      repeating-radial-gradient(circle at 50% 50%,
+        rgba(255,255,255,.05) 0 2px, transparent 2px 6px);
+    background-color:var(--pt-canvas);
+    box-shadow:0 10px 30px rgba(50,45,61,.28), inset 0 0 0 1px rgba(255,255,255,.06);
+    animation:spin 9s linear infinite; animation-play-state:paused;
+    position:relative;
+  }
+  .disc.playing{animation-play-state:running;}
+  .disc .label{
+    position:absolute; inset:26%; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--pt-on-accent); font-size:30px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); /* JSで曲ごとに上書き */
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.25);
+    text-shadow:0 1px 4px rgba(0,0,0,.35);
+  }
+  .disc .hole{
+    position:absolute; left:50%; top:50%; width:12px; height:12px;
+    transform:translate(-50%,-50%); border-radius:50%;
+    background:var(--panel); box-shadow:0 0 0 3px rgba(0,0,0,.4);
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* 右側: 情報+操作 */
+  .deck{flex:1 1 300px; min-width:260px;}
+  .nowlabel{font-size:11px; letter-spacing:.14em; color:var(--accent); font-weight:bold;}
+  .title{
+    font-size:21px; font-weight:bold; margin:4px 0 2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .subtitle{color:var(--sub); font-size:12px; margin-bottom:14px; min-height:1.2em;}
+
+  /* シークバー */
+  .seekrow{display:flex; align-items:center; gap:10px;}
+  .time{font-family:var(--pt-mono); font-size:12px; color:var(--sub); min-width:42px;}
+  .time.right{text-align:right;}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:3px;
+    background:linear-gradient(to right,var(--accent) 0%,var(--accent) var(--val,0%),var(--pt-line-soft) var(--val,0%));
+    outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:15px; height:15px; border-radius:50%;
+    background:var(--accent); border:2px solid var(--pt-card);
+    box-shadow:0 1px 4px rgba(50,45,61,.35); transition:transform .1s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2);}
+  input[type=range]::-moz-range-thumb{
+    width:13px; height:13px; border-radius:50%; background:var(--accent);
+    border:2px solid var(--pt-card);
+  }
+
+  /* 操作ボタン */
+  .controls{display:flex; align-items:center; justify-content:center; gap:14px; margin:16px 0 10px;}
+  .cbtn{
+    border:none; background:var(--panel2); color:var(--text); cursor:pointer;
+    width:44px; height:44px; border-radius:50%; font-size:17px;
+    display:flex; align-items:center; justify-content:center; transition:.15s;
+  }
+  .cbtn:hover{background:var(--pt-btn-hover);}
+  .cbtn.main{
+    width:60px; height:60px; font-size:23px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:var(--pt-on-accent);
+    box-shadow:0 4px 14px rgba(111,95,166,.4);
+  }
+  .cbtn.main:hover{filter:brightness(1.08);}
+  .cbtn.toggle{width:38px; height:38px; font-size:14px; color:var(--sub);}
+  .cbtn.toggle.on{background:var(--accent); color:var(--pt-on-accent);}
+  .cbtn .rep1{
+    position:absolute; font-size:9px; font-weight:bold; transform:translate(1px,1px);
+  }
+
+  /* 音量 */
+  .volrow{display:flex; align-items:center; gap:10px; max-width:230px; margin:0 auto;}
+  .volrow .icon{font-size:14px; color:var(--sub); cursor:pointer; width:20px; text-align:center;}
+  .volrow input[type=range]{height:5px;}
+
+  /* ビジュアライザ */
+  .vis{
+    display:block; width:100%; height:64px; margin-top:16px;
+    background:var(--pt-canvas); border-radius:10px;
+  }
+
+  /* ===== プレイリスト ===== */
+  .listhead{display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+  .listhead h2{font-size:15px; display:flex; align-items:center; gap:8px;}
+  .listhead .badge{
+    font-size:11px; font-weight:normal; color:var(--sub);
+    background:var(--panel2); border-radius:20px; padding:2px 10px;
+  }
+  .listhead input[type=search]{
+    flex:1; min-width:140px; border:1px solid var(--border); border-radius:20px;
+    padding:6px 14px; font-size:13px; background:var(--pt-field); color:var(--text); outline:none;
+  }
+  .listhead input[type=search]:focus{border-color:var(--accent);}
+  .listhead button{
+    border:1px solid var(--border); background:var(--pt-btn); color:var(--text);
+    border-radius:20px; padding:6px 14px; font-size:13px; cursor:pointer; transition:.15s;
+  }
+  .listhead button:hover{background:var(--pt-btn-hover);}
+
+  ul.songs{list-style:none;}
+  ul.songs li{
+    display:flex; align-items:center; gap:12px; padding:9px 12px;
+    border-radius:10px; cursor:pointer; border-bottom:1px solid var(--pt-line-soft);
+    transition:background .12s;
+  }
+  ul.songs li:last-child{border-bottom:none;}
+  ul.songs li:hover{background:var(--pt-hover);}
+  ul.songs li .no{
+    font-family:var(--pt-mono); font-size:11px; color:var(--sub); width:24px; text-align:right;
+  }
+  ul.songs li .chip{
+    width:30px; height:30px; border-radius:8px; flex:0 0 auto;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex; align-items:center; justify-content:center;
+    color:var(--pt-on-accent); font-size:13px;
+  }
+  ul.songs li .name{
+    flex:1; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  ul.songs li.active{background:var(--pt-card); box-shadow:inset 0 0 0 1px var(--accent);}
+  ul.songs li.active .name{color:var(--accent); font-weight:bold;}
+  ul.songs li .eq{display:none; gap:2px; align-items:flex-end; height:14px;}
+  ul.songs li.active.playing .eq{display:flex;}
+  .eq span{width:3px; background:var(--accent); border-radius:1px; animation:eq .8s ease-in-out infinite;}
+  .eq span:nth-child(1){animation-delay:0s;} .eq span:nth-child(2){animation-delay:.25s;}
+  .eq span:nth-child(3){animation-delay:.5s;}
+  @keyframes eq{0%,100%{height:4px;}50%{height:14px;}}
+
+  .hint{color:var(--sub); font-size:12px; margin-top:10px; line-height:1.6;}
+  .status{font-size:12px; margin-top:8px; min-height:1.2em;}
+  .status.warn{color:var(--pt-warn);}
+  .status.ok{color:var(--pt-ok);}
+  kbd{
+    font-family:var(--pt-mono); font-size:11px; background:var(--pt-card);
+    border:1px solid var(--border); border-bottom-width:2px; border-radius:4px; padding:0 5px;
+  }
+
+  @media (max-width:640px){
+    .player{flex-direction:column;}
+    .discwrap{width:180px; height:180px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Plantain Player<span class="dot">.</span></h1>
+  <div class="tagline">../Songs フォルダの楽曲を再生するミュージックプレイヤー</div>
+
+  <section>
+    <div class="player">
+      <div class="discwrap">
+        <div class="disc" id="disc">
+          <div class="label" id="discLabel">♪</div>
+          <div class="hole"></div>
+        </div>
+      </div>
+      <div class="deck">
+        <div class="nowlabel">NOW PLAYING</div>
+        <div class="title" id="title">曲を選択してください</div>
+        <div class="subtitle" id="subtitle">&nbsp;</div>
+        <div class="seekrow">
+          <span class="time" id="tCur">0:00</span>
+          <input type="range" id="seek" min="0" max="1000" value="0" step="1">
+          <span class="time right" id="tDur">0:00</span>
+        </div>
+        <div class="controls">
+          <button class="cbtn toggle" id="btnShuffle" title="シャッフル">⤨</button>
+          <button class="cbtn" id="btnPrev" title="前の曲 / 曲頭へ">⏮</button>
+          <button class="cbtn main" id="btnPlay" title="再生/一時停止">▶</button>
+          <button class="cbtn" id="btnNext" title="次の曲">⏭</button>
+          <button class="cbtn toggle" id="btnRepeat" title="リピート: オフ→全曲→1曲">↻</button>
+        </div>
+        <div class="volrow">
+          <span class="icon" id="volIcon" title="ミュート切替">🔊</span>
+          <input type="range" id="vol" min="0" max="100" value="80">
+        </div>
+      </div>
+    </div>
+    <canvas class="vis" id="vis"></canvas>
+  </section>
+
+  <section>
+    <div class="listhead">
+      <h2>プレイリスト <span class="badge" id="count">0曲</span></h2>
+      <input type="search" id="filter" placeholder="曲名で絞り込み">
+      <button id="btnReload">🔄 更新</button>
+    </div>
+    <ul class="songs" id="songList"></ul>
+    <div class="status" id="status"></div>
+    <div class="hint">
+      曲を追加したら mp3/wav 等を <b>Songs</b> フォルダに入れ、<b>Songs/songs.json</b> にファイル名を追記して「🔄 更新」。
+      (ディレクトリ一覧を返すローカルサーバー経由なら songs.json なしでも自動検出)<br>
+      <kbd>Space</kbd> 再生/停止 · <kbd>←</kbd><kbd>→</kbd> ±5秒 · <kbd>↑</kbd><kbd>↓</kbd> 音量 · <kbd>N</kbd>/<kbd>P</kbd> 次/前の曲
+    </div>
+  </section>
+</div>
+
+<audio id="audio" preload="metadata"></audio>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const SONGS_DIR="../Songs/";
+const AUDIO_RE=/\.(mp3|wav|m4a|aac|ogg|opus|flac|webm)$/i;
+const LS="plantainPlayer.";
+
+const audio=$("audio");
+let songs=[];          // 全曲 (ソート済み)
+let cur=-1;            // songs 内の現在インデックス
+let shuffle=localStorage.getItem(LS+"shuffle")==="1";
+let repeat=localStorage.getItem(LS+"repeat")||"off"; // off | all | one
+let seeking=false;
+
+/* ---------- ユーティリティ ---------- */
+function fmt(s){
+  if(!isFinite(s)) return "0:00";
+  s=Math.max(0,Math.round(s));
+  return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+}
+function baseName(n){ return n.replace(/\.[^.]+$/,""); }
+function setStatus(msg,cls){ const el=$("status"); el.textContent=msg||""; el.className="status "+(cls||""); }
+function hueOf(n){ let h=0; for(const c of n) h=(h*31+c.codePointAt(0))>>>0; return h%360; }
+function gradOf(n){
+  const h=hueOf(n);
+  return `linear-gradient(135deg, hsl(${h} 42% 58%), hsl(${(h+70)%360} 45% 45%))`;
+}
+function setRangeFill(el,pct){ el.style.setProperty("--val",pct+"%"); }
+
+/* ---------- 曲一覧の取得 (songs.json → ディレクトリ一覧) ---------- */
+async function listSongs(){
+  let names=null;
+  try{
+    const res=await fetch(SONGS_DIR+"songs.json",{cache:"no-store"});
+    if(res.ok){
+      const o=await res.json();
+      names=(Array.isArray(o)?o:(o&&o.songs)||[]).filter(n=>typeof n==="string"&&AUDIO_RE.test(n));
+    }
+  }catch(e){}
+  if(!names){
+    try{
+      const res=await fetch(SONGS_DIR,{cache:"no-store"});
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      const doc=new DOMParser().parseFromString(await res.text(),"text/html");
+      names=[...doc.querySelectorAll("a[href]")]
+        .map(a=>{ try{ return decodeURIComponent(a.getAttribute("href").split("?")[0].replace(/\/$/,"").split("/").pop()); }catch(e){ return ""; } })
+        .filter(n=>AUDIO_RE.test(n));
+    }catch(e){}
+  }
+  if(!names){
+    setStatus("Songs一覧を取得できません。Songs/songs.json を置くか、ローカルサーバー (例: python -m http.server) 経由で開いてください。","warn");
+    return;
+  }
+  const playing=cur>=0?songs[cur]:null;
+  songs=[...new Set(names)].sort((a,b)=>a.localeCompare(b,"ja"));
+  cur=playing?songs.indexOf(playing):-1;
+  renderList();
+  setStatus(songs.length?"":"songs.json に曲がありません。","warn");
+}
+
+/* ---------- プレイリスト描画 ---------- */
+function renderList(){
+  const q=$("filter").value.trim().toLowerCase();
+  const ul=$("songList"); ul.innerHTML="";
+  songs.forEach((n,i)=>{
+    if(q && !n.toLowerCase().includes(q)) return;
+    const li=document.createElement("li");
+    li.dataset.i=i;
+    li.innerHTML=
+      `<span class="no">${i+1}</span>`+
+      `<span class="chip" style="background:${gradOf(n)}">♪</span>`+
+      `<span class="name"></span>`+
+      `<span class="eq"><span></span><span></span><span></span></span>`;
+    li.querySelector(".name").textContent=baseName(n);
+    li.title=n;
+    li.onclick=()=>play(i);
+    ul.appendChild(li);
+  });
+  $("count").textContent=songs.length+"曲";
+  updateActive();
+}
+function updateActive(){
+  document.querySelectorAll("#songList li").forEach(li=>{
+    const on=+li.dataset.i===cur;
+    li.classList.toggle("active",on);
+    li.classList.toggle("playing",on&&!audio.paused);
+  });
+}
+
+/* ---------- 再生制御 ---------- */
+function play(i){
+  if(i<0||i>=songs.length) return;
+  cur=i;
+  const n=songs[i];
+  audio.src=SONGS_DIR+encodeURIComponent(n);
+  audio.play().catch(e=>setStatus("再生できません: "+n+" ("+e.message+")","warn"));
+  $("title").textContent=baseName(n);
+  $("title").title=n;
+  $("subtitle").textContent=n;
+  $("discLabel").style.background=gradOf(n);
+  localStorage.setItem(LS+"last",n);
+  updateMediaSession(n);
+  updateActive();
+}
+function next(auto){
+  if(!songs.length) return;
+  if(shuffle && songs.length>1){
+    let i; do{ i=Math.floor(Math.random()*songs.length); }while(i===cur);
+    play(i);
+  }else{
+    const i=cur+1;
+    if(i>=songs.length){
+      if(repeat==="all"||!auto) play(0);
+    }else play(i);
+  }
+}
+function prev(){
+  if(audio.currentTime>3){ audio.currentTime=0; return; }
+  if(shuffle){ next(false); return; }
+  play(cur<=0?songs.length-1:cur-1);
+}
+function togglePlay(){
+  if(cur<0){ if(songs.length) play(0); return; }
+  if(audio.paused) audio.play(); else audio.pause();
+}
+
+audio.onended=()=>{
+  if(repeat==="one"){ audio.currentTime=0; audio.play(); }
+  else next(true);
+};
+audio.onplay=()=>{
+  $("btnPlay").textContent="⏸";
+  $("disc").classList.add("playing");
+  initVis();
+  updateActive();
+};
+audio.onpause=()=>{
+  $("btnPlay").textContent="▶";
+  $("disc").classList.remove("playing");
+  updateActive();
+};
+audio.ontimeupdate=()=>{
+  if(seeking) return;
+  const d=audio.duration||0, t=audio.currentTime||0;
+  const pct=d?t/d*100:0;
+  $("seek").value=d?Math.round(t/d*1000):0;
+  setRangeFill($("seek"),pct);
+  $("tCur").textContent=fmt(t);
+  $("tDur").textContent=fmt(d);
+};
+audio.onerror=()=>{ if(cur>=0) setStatus("読み込みエラー: "+songs[cur],"warn"); };
+
+/* ---------- UI イベント ---------- */
+$("btnPlay").onclick=togglePlay;
+$("btnNext").onclick=()=>next(false);
+$("btnPrev").onclick=prev;
+
+$("btnShuffle").onclick=()=>{
+  shuffle=!shuffle;
+  localStorage.setItem(LS+"shuffle",shuffle?"1":"0");
+  syncToggles();
+};
+$("btnRepeat").onclick=()=>{
+  repeat=repeat==="off"?"all":repeat==="all"?"one":"off";
+  localStorage.setItem(LS+"repeat",repeat);
+  syncToggles();
+};
+function syncToggles(){
+  $("btnShuffle").classList.toggle("on",shuffle);
+  const r=$("btnRepeat");
+  r.classList.toggle("on",repeat!=="off");
+  r.innerHTML=repeat==="one"?'↻<span class="rep1">1</span>':"↻";
+  r.title="リピート: "+(repeat==="off"?"オフ":repeat==="all"?"全曲":"1曲");
+}
+
+const seekEl=$("seek");
+seekEl.oninput=()=>{
+  seeking=true;
+  const d=audio.duration||0;
+  setRangeFill(seekEl,seekEl.value/10);
+  $("tCur").textContent=fmt(d*seekEl.value/1000);
+};
+seekEl.onchange=()=>{
+  const d=audio.duration||0;
+  if(d) audio.currentTime=d*seekEl.value/1000;
+  seeking=false;
+};
+
+const volEl=$("vol");
+let lastVol=+(localStorage.getItem(LS+"vol")??80);
+function setVol(v){
+  v=Math.min(100,Math.max(0,v));
+  volEl.value=v;
+  audio.volume=v/100;
+  setRangeFill(volEl,v);
+  $("volIcon").textContent=v===0?"🔇":v<50?"🔉":"🔊";
+  localStorage.setItem(LS+"vol",v);
+}
+volEl.oninput=()=>setVol(+volEl.value);
+$("volIcon").onclick=()=>{
+  if(+volEl.value>0){ lastVol=+volEl.value; setVol(0); }
+  else setVol(lastVol||80);
+};
+
+$("btnReload").onclick=listSongs;
+$("filter").oninput=renderList;
+
+document.addEventListener("keydown",e=>{
+  if(e.target.matches("input,select,textarea")) return;
+  switch(e.key){
+    case " ": e.preventDefault(); togglePlay(); break;
+    case "ArrowRight": audio.currentTime=Math.min(audio.duration||0,audio.currentTime+5); break;
+    case "ArrowLeft": audio.currentTime=Math.max(0,audio.currentTime-5); break;
+    case "ArrowUp": e.preventDefault(); setVol(+volEl.value+5); break;
+    case "ArrowDown": e.preventDefault(); setVol(+volEl.value-5); break;
+    case "n": case "N": next(false); break;
+    case "p": case "P": prev(); break;
+  }
+});
+
+/* ---------- Media Session (OSのメディアキー対応) ---------- */
+function updateMediaSession(n){
+  if(!("mediaSession" in navigator)) return;
+  navigator.mediaSession.metadata=new MediaMetadata({title:baseName(n),artist:"Plantain Player"});
+  navigator.mediaSession.setActionHandler("play",()=>audio.play());
+  navigator.mediaSession.setActionHandler("pause",()=>audio.pause());
+  navigator.mediaSession.setActionHandler("previoustrack",prev);
+  navigator.mediaSession.setActionHandler("nexttrack",()=>next(false));
+}
+
+/* ---------- ビジュアライザ ---------- */
+let ac=null, analyser=null, visRunning=false;
+function initVis(){
+  if(!analyser){
+    try{
+      ac=new (window.AudioContext||window.webkitAudioContext)();
+      const src=ac.createMediaElementSource(audio);
+      analyser=ac.createAnalyser();
+      analyser.fftSize=256;
+      analyser.smoothingTimeConstant=.82;
+      src.connect(analyser); analyser.connect(ac.destination);
+    }catch(e){ analyser=null; return; }
+  }
+  if(ac.state==="suspended") ac.resume();
+  if(!visRunning){ visRunning=true; drawVis(); }
+}
+function drawVis(){
+  requestAnimationFrame(drawVis);
+  const cv=$("vis"), ctx=cv.getContext("2d");
+  const w=cv.clientWidth, h=cv.clientHeight;
+  if(cv.width!==w*devicePixelRatio){ cv.width=w*devicePixelRatio; cv.height=h*devicePixelRatio; ctx.scale(devicePixelRatio,devicePixelRatio); }
+  ctx.clearRect(0,0,w,h);
+  if(!analyser) return;
+  const data=new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  const bars=64, gap=2, bw=(w-gap*(bars-1))/bars;
+  const css=getComputedStyle(document.documentElement);
+  const c1=css.getPropertyValue("--pt-accent").trim()||"#6f5fa6";
+  const c2=css.getPropertyValue("--pt-accent-2").trim()||"#3f7b96";
+  for(let i=0;i<bars;i++){
+    const v=data[Math.floor(i*data.length/bars*.85)]/255;
+    const bh=Math.max(2,v*(h-8));
+    const g=ctx.createLinearGradient(0,h,0,h-bh);
+    g.addColorStop(0,c1); g.addColorStop(1,c2);
+    ctx.fillStyle=g;
+    ctx.globalAlpha=audio.paused?.35:1;
+    ctx.beginPath();
+    ctx.roundRect(i*(bw+gap),h-4-bh,bw,bh,2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+/* ---------- 初期化 ---------- */
+setVol(lastVol);
+syncToggles();
+listSongs().then(()=>{
+  const last=localStorage.getItem(LS+"last");
+  if(last&&songs.includes(last)){
+    cur=songs.indexOf(last);
+    const n=songs[cur];
+    audio.src=SONGS_DIR+encodeURIComponent(n);
+    $("title").textContent=baseName(n);
+    $("subtitle").textContent=n;
+    $("discLabel").style.background=gradOf(n);
+    updateActive();
+  }
+});
+drawVis();
+</script>
+</body>
+</html>

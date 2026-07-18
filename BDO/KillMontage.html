@@ -368,7 +368,7 @@ async function listSongs(){
   }
   const uniq=[...new Set(names)].sort((a,b)=>a.localeCompare(b,"ja"));
   sel.innerHTML="";
-  const o0=document.createElement("option"); o0.value=""; o0.textContent="(../Songs から選択: "+uniq.length+"曲)"; sel.appendChild(o0);
+  const o0=document.createElement("option"); o0.value=""; o0.textContent="(AI 楽曲から選択: "+uniq.length+"曲)"; sel.appendChild(o0);
   for(const n of uniq){ const o=document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o); }
   if(uniq.includes(cur)) sel.value=cur;
   setStatus($("songStatus"),uniq.length?"":"songs.json に曲がありません。","warn");

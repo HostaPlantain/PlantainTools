@@ -62,7 +62,7 @@ progress{width:100%;height:8px}
 </head>
 <body>
 <header>
-  <h1>BDO Kill Montage Maker <span style="color:var(--acc)">v4.0</span></h1>
+  <h1>BDO Kill Montage Maker <span style="color:var(--acc)">v4.1</span></h1>
   <span style="color:var(--dim);font-size:12px">連続キル統合 + 可変シーン長/速度で全キルをビートに同期 (BGMなし出力対応 / Songsフォルダ連携)</span>
 </header>
 <main>
@@ -124,7 +124,7 @@ progress{width:100%;height:8px}
         <button id="btnShiftBeat" disabled title="小節頭の位置を1拍ずらす">+1拍ずらし</button>
         <button id="btnClickPlay" disabled title="拍の位置でクリック音を鳴らして確認">🔔 拍クリック試聴</button>
       </div>
-      <div class="hint">波形の山とビート線(黄=拍 / 橙=小節頭)が合うように調整。「拍クリック試聴」でメトロノーム音と曲がズレていなければOK。波形クリックでその位置を小節頭にできます。BPM/オフセットは数値欄への直接入力も可能。動画ファイル(mp4/webm等)を開くとその音声をBGMに使えます (ドラッグ&ドロップした動画は素材になるため、BGMにする場合はこのボタンから)。BGMなしでも再生・書き出しでき、その場合も設定したBPM/拍オフセットに従います。「Songs」プルダウンでは ../Songs フォルダの曲を相対パスで直接読み込めます (曲を追加したら「🔄 更新」)。</div>
+      <div class="hint">波形の山とビート線(黄=拍 / 橙=小節頭)が合うように調整。「拍クリック試聴」でメトロノーム音と曲がズレていなければOK。波形クリックでその位置を小節頭にできます。BPM/オフセットは数値欄への直接入力も可能。動画ファイル(mp4/webm等)を開くとその音声をBGMに使えます (ドラッグ&ドロップした動画は素材になるため、BGMにする場合はこのボタンから)。BGMなしでも再生・書き出しでき、その場合も設定したBPM/拍オフセットに従います。「Songs」プルダウンでは ../Songs フォルダの曲を相対パスで直接読み込めます。一覧は Songs/songs.json (無ければサーバーのディレクトリ一覧) から取得するので、曲を追加したら songs.json にも追記して「🔄 更新」してください。</div>
       <div class="status" id="bgmStatus"></div>
     </div>
 
@@ -346,22 +346,31 @@ const SONGS_DIR="../Songs/";
 const AUDIO_RE=/\.(wav|mp3|m4a|aac|ogg|oga|opus|flac)$/i;
 async function listSongs(){
   const sel=$("songSel"), cur=sel.value;
-  try{
-    const res=await fetch(SONGS_DIR,{cache:"no-store"});
-    if(!res.ok) throw new Error("HTTP "+res.status);
-    const doc=new DOMParser().parseFromString(await res.text(),"text/html");
-    const names=[...doc.querySelectorAll("a[href]")]
-      .map(a=>{ try{ return decodeURIComponent(a.getAttribute("href").split("?")[0].replace(/\/$/,"").split("/").pop()); }catch(e){ return ""; } })
-      .filter(n=>AUDIO_RE.test(n));
-    const uniq=[...new Set(names)].sort((a,b)=>a.localeCompare(b,"ja"));
-    sel.innerHTML="";
-    const o0=document.createElement("option"); o0.value=""; o0.textContent="(../Songs から選択: "+uniq.length+"曲)"; sel.appendChild(o0);
-    for(const n of uniq){ const o=document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o); }
-    if(uniq.includes(cur)) sel.value=cur;
-    setStatus($("songStatus"),"");
-  }catch(e){
-    setStatus($("songStatus"),"Songs一覧を取得できません。ディレクトリ一覧表示に対応したローカルサーバー (例: python -m http.server) 経由で開いてください。","warn");
+  let names=null;
+  try{ // 1) マニフェスト Songs/songs.json (GitHub Pages 等、ディレクトリ一覧を返さないサーバー用)
+    const res=await fetch(SONGS_DIR+"songs.json",{cache:"no-store"});
+    if(res.ok){ const o=await res.json(); names=(Array.isArray(o)?o:(o&&o.songs)||[]).filter(n=>typeof n==="string"&&n); }
+  }catch(e){}
+  if(!names){
+    try{ // 2) ディレクトリ一覧 (python -m http.server 等)
+      const res=await fetch(SONGS_DIR,{cache:"no-store"});
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      const doc=new DOMParser().parseFromString(await res.text(),"text/html");
+      names=[...doc.querySelectorAll("a[href]")]
+        .map(a=>{ try{ return decodeURIComponent(a.getAttribute("href").split("?")[0].replace(/\/$/,"").split("/").pop()); }catch(e){ return ""; } })
+        .filter(n=>AUDIO_RE.test(n));
+    }catch(e){}
   }
+  if(!names){
+    setStatus($("songStatus"),"Songs一覧を取得できません。Songs/songs.json を置くか、ディレクトリ一覧対応のローカルサーバー (例: python -m http.server) 経由で開いてください。","warn");
+    return;
+  }
+  const uniq=[...new Set(names)].sort((a,b)=>a.localeCompare(b,"ja"));
+  sel.innerHTML="";
+  const o0=document.createElement("option"); o0.value=""; o0.textContent="(../Songs から選択: "+uniq.length+"曲)"; sel.appendChild(o0);
+  for(const n of uniq){ const o=document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o); }
+  if(uniq.includes(cur)) sel.value=cur;
+  setStatus($("songStatus"),uniq.length?"":"songs.json に曲がありません。","warn");
 }
 $("btnSongReload").onclick=()=>listSongs();
 $("songSel").onchange=async()=>{

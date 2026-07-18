@@ -62,8 +62,8 @@ progress{width:100%;height:8px}
 </head>
 <body>
 <header>
-  <h1>BDO Kill Montage Maker <span style="color:var(--acc)">v3.0</span></h1>
-  <span style="color:var(--dim);font-size:12px">連続キル統合 + 可変シーン長/速度で全キルをビートに同期 (BGMなし出力対応)</span>
+  <h1>BDO Kill Montage Maker <span style="color:var(--acc)">v4.0</span></h1>
+  <span style="color:var(--dim);font-size:12px">連続キル統合 + 可変シーン長/速度で全キルをビートに同期 (BGMなし出力対応 / Songsフォルダ連携)</span>
 </header>
 <main>
   <section id="left">
@@ -77,8 +77,8 @@ progress{width:100%;height:8px}
       <button id="btnHead" disabled>⏮ 頭から</button>
       <span id="tdisp">0:00 / 0:00</span>
       <span style="flex:1"></span>
-      <label class="sl" style="width:190px" title="書き出しにも反映されます">BGM音量 <input type="range" id="vol" min="0" max="1" step="0.05" value="1"><span class="val" style="width:38px" id="volV">100%</span></label>
-      <label class="sl" style="width:210px" title="ゲーム音。書き出しにも反映されます">クリップ音量 <input type="range" id="cvol" min="0" max="1" step="0.05" value="0.3"><span class="val" style="width:38px" id="cvolV">30%</span></label>
+      <label class="sl" style="width:190px" title="書き出しにも反映されます (100%超は増幅)">BGM音量 <input type="range" id="vol" min="0" max="200" step="5" value="100"><span class="val" style="width:38px" id="volV">100%</span></label>
+      <label class="sl" style="width:210px" title="ゲーム音。書き出しにも反映されます (100%超は増幅)">クリップ音量 <input type="range" id="cvol" min="0" max="200" step="5" value="100"><span class="val" style="width:38px" id="cvolV">100%</span></label>
       <span style="color:var(--dim);font-size:12px"><kbd>Space</kbd>再生/停止</span>
     </div>
   </section>
@@ -104,6 +104,12 @@ progress{width:100%;height:8px}
         <input type="file" id="bgmInput" accept="audio/*,video/*,.mkv" style="display:none">
         <span id="bgmName" class="hint" style="margin:0"></span>
       </div>
+      <div class="row">
+        <span class="hint" style="margin:0">Songs:</span>
+        <select id="songSel" style="flex:1;min-width:0"><option value="">(../Songs から選択)</option></select>
+        <button id="btnSongReload" title="../Songs の曲一覧を再取得">🔄 更新</button>
+      </div>
+      <div class="status" id="songStatus"></div>
       <canvas id="wave" title="クリックした位置を小節頭(強拍)に合わせます"></canvas>
       <div class="row">
         <label class="sl" style="flex:1;margin:0">表示 <input type="range" id="waveScroll" min="0" max="0" step="0.1" value="0"></label>
@@ -118,7 +124,7 @@ progress{width:100%;height:8px}
         <button id="btnShiftBeat" disabled title="小節頭の位置を1拍ずらす">+1拍ずらし</button>
         <button id="btnClickPlay" disabled title="拍の位置でクリック音を鳴らして確認">🔔 拍クリック試聴</button>
       </div>
-      <div class="hint">波形の山とビート線(黄=拍 / 橙=小節頭)が合うように調整。「拍クリック試聴」でメトロノーム音と曲がズレていなければOK。波形クリックでその位置を小節頭にできます。BPM/オフセットは数値欄への直接入力も可能。動画ファイル(mp4/webm等)を開くとその音声をBGMに使えます (ドラッグ&ドロップした動画は素材になるため、BGMにする場合はこのボタンから)。BGMなしでも再生・書き出しでき、その場合も設定したBPM/拍オフセットに従います。</div>
+      <div class="hint">波形の山とビート線(黄=拍 / 橙=小節頭)が合うように調整。「拍クリック試聴」でメトロノーム音と曲がズレていなければOK。波形クリックでその位置を小節頭にできます。BPM/オフセットは数値欄への直接入力も可能。動画ファイル(mp4/webm等)を開くとその音声をBGMに使えます (ドラッグ&ドロップした動画は素材になるため、BGMにする場合はこのボタンから)。BGMなしでも再生・書き出しでき、その場合も設定したBPM/拍オフセットに従います。「Songs」プルダウンでは ../Songs フォルダの曲を相対パスで直接読み込めます (曲を追加したら「🔄 更新」)。</div>
       <div class="status" id="bgmStatus"></div>
     </div>
 
@@ -229,14 +235,20 @@ function ensureGraph(){
   const ctx=actx();
   const master=ctx.createGain(), spk=ctx.createGain(), dest=ctx.createMediaStreamDestination();
   master.connect(spk); spk.connect(ctx.destination); master.connect(dest);
-  AG={ctx,master,spk,dest,hooked:new Set()};
+  AG={ctx,master,spk,dest,gains:new Map()};
   hookAudio(bgmAudio);
   for(const v of M.videos) hookAudio(v.el);
+  applyVols();
   return AG;
 }
+/* 各要素を GainNode 経由で接続 (音量100%超の増幅用) */
 function hookAudio(el){
-  if(!AG||AG.hooked.has(el)) return;
-  try{ AG.ctx.createMediaElementSource(el).connect(AG.master); AG.hooked.add(el); }catch(e){}
+  if(!AG||AG.gains.has(el)) return;
+  try{
+    const g=AG.ctx.createGain();
+    AG.ctx.createMediaElementSource(el).connect(g); g.connect(AG.master);
+    AG.gains.set(el,g);
+  }catch(e){}
 }
 
 /* ============================== 1. materials ============================== */
@@ -257,7 +269,8 @@ document.addEventListener("drop",e=>{
 function addVideo(f){
   if(M.videos.some(v=>v.name===f.name&&v.size===f.size)) return;
   const el=document.createElement("video");
-  el.volume=+$("cvol").value; el.muted=el.volume===0;
+  const cv0=+$("cvol").value/100;
+  el.volume=Math.min(1,cv0); el.muted=cv0===0;
   el.playsInline=true; el.preload="auto";
   el.src=URL.createObjectURL(f);
   $("videoWrap").insertBefore(el,$("beatDot"));
@@ -327,6 +340,44 @@ $("mergeGap").onchange=()=>{ rebuildScenes(); saveSoon(); };
 $("btnBgm").onclick=()=>$("bgmInput").click();
 $("bgmInput").onchange=e=>{ if(e.target.files[0]) loadBgm(e.target.files[0]); e.target.value=""; };
 const bgmAudio=new Audio();
+
+/* ---- Songs フォルダ (../Songs/ 相対パス) ---- */
+const SONGS_DIR="../Songs/";
+const AUDIO_RE=/\.(wav|mp3|m4a|aac|ogg|oga|opus|flac)$/i;
+async function listSongs(){
+  const sel=$("songSel"), cur=sel.value;
+  try{
+    const res=await fetch(SONGS_DIR,{cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const doc=new DOMParser().parseFromString(await res.text(),"text/html");
+    const names=[...doc.querySelectorAll("a[href]")]
+      .map(a=>{ try{ return decodeURIComponent(a.getAttribute("href").split("?")[0].replace(/\/$/,"").split("/").pop()); }catch(e){ return ""; } })
+      .filter(n=>AUDIO_RE.test(n));
+    const uniq=[...new Set(names)].sort((a,b)=>a.localeCompare(b,"ja"));
+    sel.innerHTML="";
+    const o0=document.createElement("option"); o0.value=""; o0.textContent="(../Songs から選択: "+uniq.length+"曲)"; sel.appendChild(o0);
+    for(const n of uniq){ const o=document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o); }
+    if(uniq.includes(cur)) sel.value=cur;
+    setStatus($("songStatus"),"");
+  }catch(e){
+    setStatus($("songStatus"),"Songs一覧を取得できません。ディレクトリ一覧表示に対応したローカルサーバー (例: python -m http.server) 経由で開いてください。","warn");
+  }
+}
+$("btnSongReload").onclick=()=>listSongs();
+$("songSel").onchange=async()=>{
+  const n=$("songSel").value; if(!n) return;
+  setStatus($("songStatus"),"読み込み中: "+n);
+  try{
+    const res=await fetch(SONGS_DIR+encodeURIComponent(n),{cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const blob=await res.blob();
+    const f=new File([blob],n,{type:blob.type||"audio/wav"});
+    f.fromSongs=true;
+    await loadBgm(f);
+    setStatus($("songStatus"),"Songs/"+n+" をBGMに設定しました。","ok");
+  }catch(e){ setStatus($("songStatus"),"読み込み失敗: "+(e.message||e),"warn"); }
+};
+listSongs();
 /* ---- transport: BGMあり=bgmAudioを時計に / BGMなし=AudioContext時計 ---- */
 const TR={base:0,ctx0:0};
 function trTime(){ return M.bgm?bgmAudio.currentTime:(M.playing?TR.base+actx().currentTime-TR.ctx0:TR.base); }
@@ -334,11 +385,15 @@ function trSeek(t){ if(M.bgm) bgmAudio.currentTime=t; else TR.base=t; }
 function trPlay(){ if(M.bgm) bgmAudio.play(); else TR.ctx0=actx().currentTime; }
 function trPause(){ if(M.bgm) bgmAudio.pause(); else TR.base=trTime(); }
 function applyVols(){
-  bgmAudio.volume=+$("vol").value;
-  $("volV").textContent=Math.round($("vol").value*100)+"%";
-  const cv=+$("cvol").value;
-  for(const v of M.videos){ v.el.volume=cv; v.el.muted=cv===0; }
-  $("cvolV").textContent=Math.round(cv*100)+"%";
+  const bv=+$("vol").value/100, cv=+$("cvol").value/100;
+  bgmAudio.volume=Math.min(1,bv); bgmAudio.muted=bv===0;
+  $("volV").textContent=$("vol").value+"%";
+  for(const v of M.videos){ v.el.volume=Math.min(1,cv); v.el.muted=cv===0; }
+  $("cvolV").textContent=$("cvol").value+"%";
+  if(AG){
+    const bg=AG.gains.get(bgmAudio); if(bg) bg.gain.value=Math.max(1,bv);
+    for(const v of M.videos){ const g=AG.gains.get(v.el); if(g) g.gain.value=Math.max(1,cv); }
+  }
 }
 $("vol").oninput=()=>{ applyVols(); saveSoon(); };
 $("cvol").oninput=()=>{ applyVols(); saveSoon(); };
@@ -711,6 +766,7 @@ async function startPreview(at){
   if(M.clickOn) stopClick();
   if(!M.segs.length) return;
   await actx().resume();
+  ensureGraph();
   M.playing=true; curSeg=null;
   for(const v of M.videos) v.el.pause();
   $("btnPlay").textContent="⏸ 停止";
@@ -770,7 +826,7 @@ function previewLoop(){
 function q(s){ return '"'+s+'"'; }
 function buildCmds(){
   const s=settings();
-  const bv=(+$("vol").value).toFixed(2), cv=(+$("cvol").value).toFixed(2);
+  const bv=(+$("vol").value/100).toFixed(2), cv=(+$("cvol").value/100).toFixed(2);
   const useGameAudio=+cv>0;
   const enc=[]; const listLines=[];
   M.segs.forEach((sg,i)=>{
@@ -823,7 +879,8 @@ $("btnBat").onclick=()=>{
   a.href=URL.createObjectURL(new Blob(["﻿"+L.join("\r\n")+"\r\n"],{type:"text/plain"}));
   a.download=settings().out+"_render.bat"; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),10000);
-  setStatus($("expStatus"),".bat を生成しました。元動画・BGMと同じフォルダに置いて実行してください。","ok");
+  const songNote=(M.bgm&&M.bgm.file.fromSongs)?"\nBGM「"+M.bgm.name+"」は Songs フォルダの曲です。.bat と同じフォルダにコピーしてから実行してください。":"";
+  setStatus($("expStatus"),".bat を生成しました。元動画・BGMと同じフォルダに置いて実行してください。"+songNote,"ok");
 };
 $("btnCopy").onclick=async()=>{
   freshenName();
@@ -919,8 +976,8 @@ function saveNow(){
     $("clipBeats").value=o.set.cb||"8"; $("tailBeats").value=o.set.tb||"4";
     $("res").value=o.set.res||"1920x1080x60";
     if(o.set.out&&!isAutoName(o.set.out)) $("outName").value=o.set.out;   // カスタム名のみ引き継ぐ
-    if(o.set.vol!=null) $("vol").value=o.set.vol;
-    if(o.set.cvol!=null) $("cvol").value=o.set.cvol;
+    if(o.set.vol!=null){ const v=+o.set.vol; $("vol").value=v<=2?Math.round(v*100):v; }   // 旧0-1スケールを移行
+    if(o.set.cvol!=null){ const v=+o.set.cvol; $("cvol").value=v<=2?Math.round(v*100):v; }
     if(o.set.mg!=null) $("mergeGap").value=o.set.mg;
     if(o.set.lm) $("lenMode").value=o.set.lm;
     if(o.set.sm) $("spdMode").value=o.set.sm;

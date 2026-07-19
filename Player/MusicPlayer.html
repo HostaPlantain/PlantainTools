@@ -292,7 +292,7 @@ const LS="plantainPlayer.";
 
 const audio=$("audio");
 let songMeta=[];       // songs.json の全曲 [{name, canDL}]
-let albums=[];         // Album.json [{name, songs:[...]}]
+let albums=[];         // album.json [{name, songs:[...]}]
 let lyricsMap={};      // 曲名 → 歌詞jsonの有無
 let curAlbum=localStorage.getItem(LS+"album")||""; // ""=すべて
 let songs=[];          // 現在の表示キュー (曲名の配列)
@@ -354,7 +354,7 @@ async function listSongs(){
 
   albums=[];
   try{
-    const res=await fetch(SONGS_DIR+"Album.json",{cache:"no-store"});
+    const res=await fetch(SONGS_DIR+"album.json",{cache:"no-store"});
     if(res.ok){
       const o=await res.json();
       if(Array.isArray(o))
@@ -391,7 +391,7 @@ function renderAlbums(){
 function buildQueue(){
   if(curAlbum){
     const a=albums.find(x=>x.name===curAlbum);
-    songs=a?[...a.songs]:[];             // アルバムは Album.json の曲順
+    songs=a?[...a.songs]:[];             // アルバムは album.json の曲順
   }else{
     songs=songMeta.map(m=>m.name).sort((a,b)=>a.localeCompare(b,"ja"));
   }

@@ -1,0 +1,27 @@
+[
+  {
+    "name":"Dreamy Pop",
+    "songs":[
+      "Level up in the dark.mp3",
+      "ReSpawn.mp3",
+      "まだまだ.mp3"
+    ]
+  },
+  {
+    "name":"Summer Pop",
+    "songs":[
+      "群青のマーリン.mp3",
+      "ロブスター・サマー.mp3",
+      "マカジキブルー.mp3"
+    ]
+  },
+  {
+    "name":"Hard Rock!",
+    "songs":[
+      "旅路.mp3",
+      "Heavy Power.mp3",
+      "半裸の帝王[Explicit].mp3",
+      "封雷咎刻 - PATTZAN Z - (超・厨二病ver).mp3"
+    ]
+  }
+]

@@ -1,8 +1,46 @@
 [
-  "Level up in the dark.mp3",
-  "ReSpawn.mp3",
-  "群青のマーリン.mp3",
-  "マカジキブルー.mp3",
-  "りなち！薄紫の青春を鳴らせ.mp3",
-  "ロブスター・サマー.mp3"
+  {
+    "name":"Heavy Power.mp3",
+    "canDL":false
+  },
+  {
+    "name":"Level up in the dark.mp3",
+    "canDL":true
+  },
+  {
+    "name":"ReSpawn.mp3",
+    "canDL":true
+  },
+  {
+    "name":"マカジキブルー.mp3",
+    "canDL":true
+  },
+  {
+    "name":"まだまだ.mp3",
+    "canDL":true
+  },
+  {
+    "name":"りなち！薄紫の青春を鳴らせ.mp3",
+    "canDL":true
+  },
+  {
+    "name":"ロブスター・サマー.mp3",
+    "canDL":true
+  },
+  {
+    "name":"群青のマーリン.mp3",
+    "canDL":true
+  },
+  {
+    "name":"半裸の帝王[Explicit].mp3",
+    "canDL":false
+  },
+  {
+    "name":"封雷咎刻 - PATTZAN Z - (超・厨二病ver).mp3",
+    "canDL":false
+  },
+  {
+    "name":"旅路.mp3",
+    "canDL":false
+  }
 ]

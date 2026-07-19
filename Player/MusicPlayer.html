@@ -135,6 +135,21 @@
     background:var(--pt-hover);
   }
 
+  /* ===== アルバム選択 ===== */
+  .albums{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+  .albm{
+    border:1px solid var(--border); background:var(--pt-btn); color:var(--text);
+    border-radius:20px; padding:6px 14px; font-size:13px; cursor:pointer;
+    display:flex; align-items:center; gap:7px; transition:.15s;
+  }
+  .albm:hover{background:var(--pt-btn-hover);}
+  .albm.on{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:var(--pt-on-accent); border-color:transparent;
+    box-shadow:0 2px 8px rgba(111,95,166,.35);
+  }
+  .albm .n{font-size:11px; opacity:.72;}
+
   /* ===== プレイリスト ===== */
   .listhead{display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
   .listhead h2{font-size:15px; display:flex; align-items:center; gap:8px;}
@@ -173,6 +188,16 @@
   ul.songs li .name{
     flex:1; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
+  ul.songs li .tag{
+    flex:0 0 auto; font-size:10px; color:var(--pt-accent-2);
+    border:1px solid currentColor; border-radius:10px; padding:1px 8px; white-space:nowrap;
+  }
+  ul.songs li .dl{
+    flex:0 0 auto; border:none; background:none; color:var(--sub); cursor:pointer;
+    width:30px; height:30px; border-radius:50%; font-size:15px;
+    display:flex; align-items:center; justify-content:center; transition:.15s;
+  }
+  ul.songs li .dl:hover{background:var(--pt-btn-hover); color:var(--accent);}
   ul.songs li.active{background:var(--pt-card); box-shadow:inset 0 0 0 1px var(--accent);}
   ul.songs li.active .name{color:var(--accent); font-weight:bold;}
   ul.songs li .eq{display:none; gap:2px; align-items:flex-end; height:14px;}
@@ -243,6 +268,7 @@
   </section>
 
   <section>
+    <div class="albums" id="albums"></div>
     <div class="listhead">
       <h2>プレイリスト <span class="badge" id="count">0曲</span></h2>
       <input type="search" id="filter" placeholder="曲名で絞り込み">
@@ -265,8 +291,13 @@ const AUDIO_RE=/\.(mp3|wav|m4a|aac|ogg|opus|flac|webm)$/i;
 const LS="plantainPlayer.";
 
 const audio=$("audio");
-let songs=[];          // 全曲 (ソート済み)
+let songMeta=[];       // songs.json の全曲 [{name, canDL}]
+let albums=[];         // Album.json [{name, songs:[...]}]
+let lyricsMap={};      // 曲名 → 歌詞jsonの有無
+let curAlbum=localStorage.getItem(LS+"album")||""; // ""=すべて
+let songs=[];          // 現在の表示キュー (曲名の配列)
 let cur=-1;            // songs 内の現在インデックス
+let playingName=null;  // 再生中の曲名 (アルバム切替時の追跡用)
 let shuffle=localStorage.getItem(LS+"shuffle")==="1";
 let repeat=localStorage.getItem(LS+"repeat")||"off"; // off | all | one
 let seeking=false;
@@ -287,34 +318,104 @@ function gradOf(n){
 function setRangeFill(el,pct){ el.style.setProperty("--val",pct+"%"); }
 
 /* ---------- 曲一覧の取得 (songs.json → ディレクトリ一覧) ---------- */
+function metaOf(n){ return songMeta.find(m=>m.name===n); }
+function albumOf(n){ const a=albums.find(a=>a.songs.includes(n)); return a?a.name:null; }
+
 async function listSongs(){
-  let names=null;
+  let meta=null;
   try{
     const res=await fetch(SONGS_DIR+"songs.json",{cache:"no-store"});
     if(res.ok){
       const o=await res.json();
-      names=(Array.isArray(o)?o:(o&&o.songs)||[]).filter(n=>typeof n==="string"&&AUDIO_RE.test(n));
+      const arr=Array.isArray(o)?o:(o&&o.songs)||[];
+      meta=arr.map(x=>
+        typeof x==="string" ? {name:x,canDL:false} :
+        (x&&typeof x.name==="string") ? {name:x.name,canDL:!!x.canDL} : null
+      ).filter(Boolean);
     }
   }catch(e){}
-  if(!names){
+  if(!meta){ // fallback: ディレクトリ一覧 (canDL は不明のため不可扱い)
     try{
       const res=await fetch(SONGS_DIR,{cache:"no-store"});
       if(!res.ok) throw new Error("HTTP "+res.status);
       const doc=new DOMParser().parseFromString(await res.text(),"text/html");
-      names=[...doc.querySelectorAll("a[href]")]
+      meta=[...doc.querySelectorAll("a[href]")]
         .map(a=>{ try{ return decodeURIComponent(a.getAttribute("href").split("?")[0].replace(/\/$/,"").split("/").pop()); }catch(e){ return ""; } })
-        .filter(n=>AUDIO_RE.test(n));
+        .filter(n=>AUDIO_RE.test(n))
+        .map(n=>({name:n,canDL:false}));
     }catch(e){}
   }
-  if(!names){
+  if(!meta){
     setStatus("Songs一覧を取得できません。Songs/songs.json を置くか、ローカルサーバー (例: python -m http.server) 経由で開いてください。","warn");
     return;
   }
-  const playing=cur>=0?songs[cur]:null;
-  songs=[...new Set(names)].sort((a,b)=>a.localeCompare(b,"ja"));
-  cur=playing?songs.indexOf(playing):-1;
+  const seen=new Set();
+  songMeta=meta.filter(m=>!seen.has(m.name)&&seen.add(m.name));
+
+  albums=[];
+  try{
+    const res=await fetch(SONGS_DIR+"Album.json",{cache:"no-store"});
+    if(res.ok){
+      const o=await res.json();
+      if(Array.isArray(o))
+        albums=o.filter(a=>a&&typeof a.name==="string"&&Array.isArray(a.songs))
+                .map(a=>({name:a.name,songs:a.songs.filter(n=>metaOf(n))}));
+    }
+  }catch(e){}
+  if(curAlbum&&!albums.some(a=>a.name===curAlbum)) curAlbum="";
+
+  renderAlbums();
+  buildQueue();
+  setStatus(songMeta.length?"":"songs.json に曲がありません。","warn");
+  checkLyrics();
+}
+
+/* ---------- アルバム ---------- */
+function renderAlbums(){
+  const box=$("albums"); box.innerHTML="";
+  const mk=(label,key,count)=>{
+    const b=document.createElement("button");
+    b.className="albm"+(curAlbum===key?" on":"");
+    const s1=document.createElement("span"), s2=document.createElement("span");
+    s1.textContent=label; s2.className="n"; s2.textContent=count+"曲";
+    b.append(s1,s2);
+    b.onclick=()=>{
+      curAlbum=key; localStorage.setItem(LS+"album",key);
+      renderAlbums(); buildQueue();
+    };
+    box.appendChild(b);
+  };
+  mk("すべて","",songMeta.length);
+  for(const a of albums) mk(a.name,a.name,a.songs.length);
+}
+function buildQueue(){
+  if(curAlbum){
+    const a=albums.find(x=>x.name===curAlbum);
+    songs=a?[...a.songs]:[];             // アルバムは Album.json の曲順
+  }else{
+    songs=songMeta.map(m=>m.name).sort((a,b)=>a.localeCompare(b,"ja"));
+  }
+  cur=playingName?songs.indexOf(playingName):-1;
   renderList();
-  setStatus(songs.length?"":"songs.json に曲がありません。","warn");
+}
+
+/* ---------- ダウンロード / 歌詞タグ ---------- */
+function downloadSong(n){
+  const a=document.createElement("a");
+  a.href=SONGS_DIR+encodeURIComponent(n); a.download=n;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+async function checkLyrics(){
+  await Promise.all(songMeta.map(async m=>{
+    if(m.name in lyricsMap) return;
+    try{
+      const url=SONGS_DIR+encodeURIComponent(baseName(m.name)+".json");
+      let res=await fetch(url,{method:"HEAD",cache:"no-store"});
+      if(!res.ok&&res.status!==404) res=await fetch(url,{cache:"no-store"}); // HEAD非対応サーバー
+      lyricsMap[m.name]=res.ok;
+    }catch(e){ lyricsMap[m.name]=false; }
+  }));
+  renderList();
 }
 
 /* ---------- プレイリスト描画 ---------- */
@@ -329,10 +430,14 @@ function renderList(){
       `<span class="no">${i+1}</span>`+
       `<span class="chip" style="background:${gradOf(n)}">♪</span>`+
       `<span class="name"></span>`+
-      `<span class="eq"><span></span><span></span><span></span></span>`;
+      (lyricsMap[n]?`<span class="tag">歌詞あり</span>`:"")+
+      `<span class="eq"><span></span><span></span><span></span></span>`+
+      (metaOf(n)?.canDL?`<button class="dl" title="ダウンロード">⬇</button>`:"");
     li.querySelector(".name").textContent=baseName(n);
     li.title=n;
     li.onclick=()=>play(i);
+    const dl=li.querySelector(".dl");
+    if(dl) dl.onclick=e=>{ e.stopPropagation(); downloadSong(n); };
     ul.appendChild(li);
   });
   $("count").textContent=songs.length+"曲";
@@ -351,11 +456,13 @@ function play(i){
   if(i<0||i>=songs.length) return;
   cur=i;
   const n=songs[i];
+  playingName=n;
   audio.src=SONGS_DIR+encodeURIComponent(n);
   audio.play().catch(e=>setStatus("再生できません: "+n+" ("+e.message+")","warn"));
   $("title").textContent=baseName(n);
   $("title").title=n;
-  $("subtitle").textContent=n;
+  const alb=albumOf(n);
+  $("subtitle").textContent=(alb?alb+" · ":"")+n;
   $("discLabel").style.background=gradOf(n);
   localStorage.setItem(LS+"last",n);
   updateMediaSession(n);
@@ -608,9 +715,11 @@ listSongs().then(()=>{
   if(last&&songs.includes(last)){
     cur=songs.indexOf(last);
     const n=songs[cur];
+    playingName=n;
     audio.src=SONGS_DIR+encodeURIComponent(n);
     $("title").textContent=baseName(n);
-    $("subtitle").textContent=n;
+    const alb=albumOf(n);
+    $("subtitle").textContent=(alb?alb+" · ":"")+n;
     $("discLabel").style.background=gradOf(n);
     updateActive();
     loadLyrics(n);

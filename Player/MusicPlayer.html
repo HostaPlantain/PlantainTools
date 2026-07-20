@@ -185,11 +185,17 @@
     display:flex; align-items:center; justify-content:center;
     color:var(--pt-on-accent); font-size:13px;
   }
+  ul.songs li .mid{
+    flex:1; min-width:0; display:flex; align-items:center; gap:8px;
+  }
   ul.songs li .name{
-    flex:1; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    flex:0 1 auto; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  ul.songs li .tagslot{
+    flex:0 0 auto; width:64px; display:flex; justify-content:center;
   }
   ul.songs li .tag{
-    flex:0 0 auto; font-size:10px; color:var(--pt-accent-2);
+    font-size:10px; color:var(--pt-accent-2);
     border:1px solid currentColor; border-radius:10px; padding:1px 8px; white-space:nowrap;
   }
   ul.songs li .dl{
@@ -197,6 +203,7 @@
     width:30px; height:30px; border-radius:50%; font-size:15px;
     display:flex; align-items:center; justify-content:center; transition:.15s;
   }
+  ul.songs li .dl.off{visibility:hidden;}
   ul.songs li .dl:hover{background:var(--pt-btn-hover); color:var(--accent);}
   ul.songs li.active{background:var(--pt-card); box-shadow:inset 0 0 0 1px var(--accent);}
   ul.songs li.active .name{color:var(--accent); font-weight:bold;}
@@ -429,18 +436,18 @@ function renderList(){
     if(q && !n.toLowerCase().includes(q)) return;
     const li=document.createElement("li");
     li.dataset.i=i;
+    const canDL=!!metaOf(n)?.canDL;
     li.innerHTML=
       `<span class="no">${i+1}</span>`+
       `<span class="chip" style="background:${gradOf(n)}">♪</span>`+
-      `<span class="name"></span>`+
-      (lyricsMap[n]?`<span class="tag">歌詞あり</span>`:"")+
-      `<span class="eq"><span></span><span></span><span></span></span>`+
-      (metaOf(n)?.canDL?`<button class="dl" title="ダウンロード">⬇</button>`:"");
+      `<span class="mid"><span class="name"></span>`+
+        `<span class="eq"><span></span><span></span><span></span></span></span>`+
+      `<span class="tagslot">${lyricsMap[n]?'<span class="tag">歌詞あり</span>':''}</span>`+
+      `<button class="dl${canDL?'':' off'}" title="ダウンロード"${canDL?'':' tabindex="-1"'}>⬇</button>`;
     li.querySelector(".name").textContent=baseName(n);
     li.title=n;
     li.onclick=()=>play(i);
-    const dl=li.querySelector(".dl");
-    if(dl) dl.onclick=e=>{ e.stopPropagation(); downloadSong(n); };
+    if(canDL) li.querySelector(".dl").onclick=e=>{ e.stopPropagation(); downloadSong(n); };
     ul.appendChild(li);
   });
   $("count").textContent=songs.length+"曲";

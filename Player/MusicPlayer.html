@@ -409,10 +409,13 @@ async function checkLyrics(){
   await Promise.all(songMeta.map(async m=>{
     if(m.name in lyricsMap) return;
     try{
-      const url=SONGS_DIR+encodeURIComponent(baseName(m.name)+".json");
-      let res=await fetch(url,{method:"HEAD",cache:"no-store"});
-      if(!res.ok&&res.status!==404) res=await fetch(url,{cache:"no-store"}); // HEAD非対応サーバー
-      lyricsMap[m.name]=res.ok;
+      const exists=async ext=>{
+        const url=SONGS_DIR+encodeURIComponent(baseName(m.name)+ext);
+        let res=await fetch(url,{method:"HEAD",cache:"no-store"});
+        if(!res.ok&&res.status!==404) res=await fetch(url,{cache:"no-store"}); // HEAD非対応サーバー
+        return res.ok;
+      };
+      lyricsMap[m.name]=await exists(".json")||await exists(".md");
     }catch(e){ lyricsMap[m.name]=false; }
   }));
   renderList();
@@ -602,9 +605,14 @@ async function loadLyrics(n){
   lyr={lines:null,timed:false,el:[],cur:-1};
   sec.style.display="none"; box.innerHTML="";
   try{
+    let lines=null;
     const res=await fetch(SONGS_DIR+encodeURIComponent(baseName(n)+".json"),{cache:"no-store"});
-    if(!res.ok) return;
-    let lines=normLyrics(await res.json());
+    if(res.ok){
+      lines=normLyrics(await res.json());
+    }else{ // フォールバック: 曲名.md (プレーンテキスト歌詞)
+      const md=await fetch(SONGS_DIR+encodeURIComponent(baseName(n)+".md"),{cache:"no-store"});
+      if(md.ok) lines=parseTextLyrics(await md.text());
+    }
     if(!lines) return;
     // 前後の空行を除去 (中間の空行は間隔として残す)
     while(lines.length&&!lines[0].text) lines.shift();

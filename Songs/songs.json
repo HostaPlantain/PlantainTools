@@ -12,6 +12,10 @@
     "canDL":true
   },
   {
+    "name":"グラスの向こう.mp3",
+    "canDL":true
+  },
+  {
     "name":"マカジキブルー.mp3",
     "canDL":true
   },
@@ -30,6 +34,10 @@
   {
     "name":"群青のマーリン.mp3",
     "canDL":true
+  },
+  {
+    "name":"灼熱スパイラル.mp3",
+    "canDL":false
   },
   {
     "name":"半裸の帝王[Explicit].mp3",

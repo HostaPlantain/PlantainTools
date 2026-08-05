@@ -16,6 +16,10 @@
     "canDL":true
   },
   {
+    "name":"ふんふんカンパニー.mp3",
+    "canDL":true
+  },
+  {
     "name":"マカジキブルー.mp3",
     "canDL":true
   },
@@ -37,7 +41,7 @@
   },
   {
     "name":"灼熱スパイラル.mp3",
-    "canDL":true
+    "canDL":false
   },
   {
     "name":"半裸の帝王[Explicit].mp3",
